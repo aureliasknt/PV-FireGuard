@@ -1,5 +1,5 @@
 'use strict';
-/* 火灾风险评估页：热失控推演 + 可解释风险融合 */
+/* 模块④ 电—热融合风险评估与预警：关联电气异常与热状态演化，依据验证判据分级 → 风险等级、触发原因与处置优先级 */
 const Risk = (() => {
   const st = { last: null };
   const ft = s => s == null ? '—' : s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${s % 60} 秒`;
@@ -18,6 +18,7 @@ const Risk = (() => {
     U.range('rk-sev', v => v.toFixed(2), schedule);
     U.range('rk-arc', v => (v * 100).toFixed(0) + '%', schedule);
     U.range('rk-dur', v => (v / 60).toFixed(0) + ' min', schedule);
+    U.range('rk-obs', v => v + ' min', schedule);
     U.range('rk-G', v => v + ' W/m²', schedule);
     U.range('rk-Ta', v => v + ' ℃', schedule);
     U.range('rk-v', v => v.toFixed(1) + ' m/s', schedule);
@@ -28,7 +29,7 @@ const Risk = (() => {
     ['rk-scene', 'rk-mat', 'rk-afci', 'rk-rsd', 'rk-mon', 'rk-spr'].forEach(id => U.$('#' + id).addEventListener('change', schedule));
     U.$('#rk-from').onclick = () => {
       const m = Station.selected();
-      if (!m) { U.toast('请先在“电站数字孪生”中点击选中一个组件', 'warn'); return; }
+      if (!m) { U.toast('请先在模块①“电站可视化与状态监测”中点击选中一个组件', 'warn'); return; }
       loadModule(m, Station.env(), Station.isAuto());
     };
   }
@@ -48,7 +49,7 @@ const Risk = (() => {
   function read() {
     const b = id => U.$('#' + id).checked, n = id => +U.$('#' + id).value;
     return {
-      type: U.$('#rk-type').value, sev: n('rk-sev'), arcProb: n('rk-arc'), dur: n('rk-dur'),
+      type: U.$('#rk-type').value, sev: n('rk-sev'), arcProb: n('rk-arc'), dur: n('rk-dur'), obs: n('rk-obs') * 60,
       G: n('rk-G'), Ta: n('rk-Ta'), v: n('rk-v'), RH: n('rk-RH'), scene: U.$('#rk-scene').value, mat: U.$('#rk-mat').value,
       debris: n('rk-debris'), age: n('rk-age'), afci: b('rk-afci'), rsd: b('rk-rsd'), mon: b('rk-mon'), spr: b('rk-spr')
     };
@@ -76,15 +77,24 @@ const Risk = (() => {
     }
     const arcDur = p.type === 'arc' ? (p.afci ? 1 : p.mon && p.rsd ? 2 : 60) : 0;
     const r = TH.risk({ ...p, Tpeak: simNo.Tpeak, Tbg: simNo.Tbg, arcDur });
-    st.last = { p, simNo, simYes, r, time: new Date() };
+    // 电—热判据核验：取观测时刻的热状态（无防护演化）与电气监测结果
+    const k = Math.min(simNo.T.length - 1, p.obs), k0 = Math.max(0, k - 60);
+    const Tobs = simNo.T[k], rate = (simNo.T[k] - simNo.T[k0]) * 60 / Math.max(1, k - k0);
+    const g = FUSE.grade({ dT: Math.max(0, Tobs - simNo.Tbg), T: Tobs, rate, pArc: p.arcProb, arcConf: p.arcProb >= FUSE.CFG.pArc,
+      sameLoop: !!f, synced: true, debris: p.debris, RH: p.RH });
+    st.last = { p, simNo, simYes, r, g, obs: { t: k, T: Tobs, rate }, time: new Date() };
     render();
   }
 
   function render() {
     const L = st.last; if (!L) return;
-    const { p, simNo, simYes, r } = L;
-    U.gauge(U.$('#rk-gauge'), r.R, `起火概率 ${(r.P * 100).toFixed(1)}%`);
-    U.$('#rk-level').innerHTML = U.tag(`${r.lv.grade}预警 · ${r.lv.name}`, r.lv.key);
+    const { p, simNo, simYes, r, g } = L;
+    U.gauge(U.$('#rk-gauge'), r.R, `参考风险指数 · 起火概率 ${(r.P * 100).toFixed(1)}%`);
+    U.$('#rk-level').innerHTML = `<div style="font-size:20px;font-weight:700;margin:2px 0 4px;color:${g.lv >= 0 ? g.level.color : '#22c55e'}">${g.lv >= 0 ? g.level.grade + '预警 · ' + g.level.name : '正常'}</div>
+      <div class="hint">处置优先级：${FUSE.prioTag(g)}</div>`;
+    U.$('#rk-crit').innerHTML = g.C.map(c => `<tr><td><b>${c.id}</b> ${c.name}</td><td>${c.val}</td><td class="muted">${c.th}</td><td>${c.lv ? U.tag(c.res, c.id === 'C6' ? 'yellow' : c.lv >= 2 ? 'red' : 'orange') : '<span class="muted">' + c.res + '</span>'}</td></tr>`).join('');
+    U.$('#rk-why').innerHTML = g.reasons.length ? g.reasons.map(x => `<li>${U.tag(U.LEVELS[x.lv].grade, U.LEVELS[x.lv].key)} <b>${x.by}</b> ${x.txt}</li>`).join('') : '<li class="muted">未满足任何预警判据</li>';
+    U.$('#rk-obs-info').textContent = `观测时刻 t = ${(L.obs.t / 60).toFixed(0)} min：故障点 ${L.obs.T.toFixed(0)} ℃，温升速率 ${L.obs.rate.toFixed(1)} K/min，电弧概率 ${(p.arcProb * 100).toFixed(0)}%`;
     // 风险矩阵
     let html = '';
     for (let l = 5; l >= 1; l--) {
@@ -99,11 +109,11 @@ const Risk = (() => {
     U.$('#rk-matrix').innerHTML = html;
     U.$('#rk-pc').innerHTML = `纵轴：可能性等级 L=${r.L}（P=${(r.P * 100).toFixed(1)}%）<br>横轴：后果严重度 C=${r.C.toFixed(1)}（${TH.SCENES[p.scene][0]} / ${TH.MATS[p.mat][0]}）`;
     // 雷达
-    const g = name => r.contrib.find(k => k.name === name);
+    const cf = name => r.contrib.find(k => k.name === name);
     const prot = 1 - ((p.afci ? 0.35 : 0) + (p.rsd ? 0.3 : 0) + (p.mon ? 0.35 : 0));
     U.radar(U.$('#rk-radar'), ['热危险', '电弧危险', '环境', '可燃物', '后果', '防护不足'], [
-      Math.max(g('热斑温差').f / 1.5, g('热失控程度').f), p.arcProb,
-      (g('环境高温').f + g('强辐照').f + g('低湿度').f) / 3, p.debris, (r.C - 1) / 4, prot
+      Math.max(cf('热斑温差').f / 1.5, cf('热失控程度').f), p.arcProb,
+      (cf('环境高温').f + cf('强辐照').f + cf('低湿度').f) / 3, p.debris, (r.C - 1) / 4, prot
     ], r.lv.color);
     // 热失控曲线
     const series = [];
@@ -120,15 +130,16 @@ const Risk = (() => {
     // 贡献
     const cs = r.contrib.filter(k => Math.abs(k.v) > 1e-3).sort((a, b) => b.v - a.v);
     U.barChart(U.$('#rk-contrib'), { labels: cs.map(k => k.name), values: cs.map(k => k.v), colors: cs.map(k => k.v >= 0 ? '#f97316' : '#22c55e'), fmt: v => (v >= 0 ? '+' : '') + v.toFixed(2) });
-    U.$('#rk-recos').innerHTML = recos(p, r, simNo, simYes).map(t => `<li>${t}</li>`).join('');
+    U.$('#rk-recos').innerHTML = recos(p, r, simNo, simYes, g).map(t => `<li>${t}</li>`).join('');
   }
 
-  function recos(p, r, simNo, simYes) {
+  function recos(p, r, simNo, simYes, g) {
     const out = [];
-    if (r.lv.idx === 3) out.push('<b style="color:#fca5a5">红色预警：</b>立即快速关断相关组串，派员携带灭火器材到场核查，并通知消防控制室做好联动准备。');
-    else if (r.lv.idx === 2) out.push('<b style="color:#fdba74">橙色预警：</b>2 小时内安排现场复核，必要时关断组串；加密红外巡检频次至每小时一次。');
-    else if (r.lv.idx === 1) out.push('<b style="color:#fde047">黄色预警：</b>纳入 24 小时检修计划，持续跟踪温度与电弧指标变化趋势。');
-    else out.push('<b style="color:#93c5fd">蓝色（低风险）：</b>保持常规巡检周期，关注季节性环境变化。');
+    if (g.lv === 3) out.push('<b style="color:#fca5a5">P1 立即处置（红色）：</b>15 min 内快速关断相关组串，派员携带灭火器材到场核查，并通知消防控制室做好联动准备。');
+    else if (g.lv === 2) out.push('<b style="color:#fdba74">P2 尽快复核（橙色）：</b>2 小时内安排现场复核，必要时关断组串；加密红外巡检频次至每小时一次。');
+    else if (g.lv === 1) out.push('<b style="color:#fde047">P3 计划检修（黄色）：</b>纳入 24 小时检修计划，持续跟踪温度与电弧指标变化趋势。');
+    else if (g.lv === 0) out.push('<b style="color:#93c5fd">P4 纳入巡检（蓝色）：</b>保持常规巡检周期，跟踪温差变化。');
+    else out.push('<b style="color:#86efac">未触发预警判据：</b>保持常规巡检周期，关注季节性环境变化。');
     if (p.type === 'arc') out.push(p.afci ? 'AFCI 可在约 1 s 内切断电弧，建议同步排查松动的 MC4 连接器并规范压接工艺。' : `未配置 AFCI 时电弧约 ${simNo.tIgn != null ? simNo.tIgn + ' 秒' : '短时间'} 内即可引燃周边材料，<b>强烈建议加装符合 UL 1699B / IEC 63027 的电弧故障断路器</b>。`);
     if (simNo.tIgn != null && p.type !== 'arc') out.push(`无防护情况下故障点约 ${ft(simNo.tIgn)} 后达到引燃温度，${simYes && simYes.tIgn == null ? '联动处置可有效阻断热失控过程。' : '需尽快处置。'}`);
     if (simNo.Tpeak >= 150 && simNo.tIgn == null) out.push(`故障点峰值温度约 ${simNo.Tpeak.toFixed(0)} ℃，已超过 EVA/背板加速劣化温度，长期运行存在热失控风险。`);

@@ -4,10 +4,10 @@ const VIS = (() => {
   const W = 200, H = 120, CW = 20, CH = 20;          // 60 片电池组件（10×6，横置）
   const JB = { x: 100, y: 8 };                       // 接线盒投影位置
   const CLS = ['shading', 'junction', 'bypass', 'crack', 'soiling', 'reflect'];
-  const CLS_NAMES = ['遮挡热斑', '接线盒/接点过热', '旁路二极管/子串异常', '电池隐裂热点', '积灰污损', '反光干扰(伪热斑)'];
+  const CLS_NAMES = ['遮挡热斑', '接线盒/连接器过热', '旁路二极管/子串异常', '电池隐裂热点', '积灰污损', '反光干扰(伪热斑)'];
   const CLS_COLORS = ['#f97316', '#ef4444', '#eab308', '#a78bfa', '#38bdf8', '#94a3b8'];
   const SCENES = {
-    normal: '正常组件', shading: '局部遮挡热斑', junction: '接线盒/接点过热', bypass: '旁路二极管失效(子串发热)',
+    normal: '正常组件', shading: '局部遮挡热斑', junction: '接线盒过热', connector: '连接器(MC4)接触不良过热', bypass: '旁路二极管失效(子串发热)',
     crack: '电池隐裂', soiling: '积灰污损', multi: '复合故障(遮挡+接点+积灰)', reflect: '反光干扰(误报测试)'
   };
 
@@ -47,6 +47,11 @@ const VIS = (() => {
       add((x, y) => a * Math.exp(-((x - JB.x) ** 2) / (2 * 8 * 8) - ((y - JB.y) ** 2) / (2 * 5 * 5)));
       truth.push({ type: 'junction', box: [JB.x - 16, 0, JB.x + 16, JB.y + 12] });
     };
+    const doConnector = () => {
+      const side = Math.random() < 0.5 ? -1 : 1, cx = JB.x + side * 14, cy = 4, a = amp != null ? amp : (15 + 50 * sev);
+      add((x, y) => a * Math.exp(-((x - cx) ** 2) / (2 * 4.5 * 4.5) - ((y - cy) ** 2) / (2 * 3.5 * 3.5)));
+      truth.push({ type: 'junction', box: [cx - 10, 0, cx + 10, cy + 9] });
+    };
     const doBypass = () => {
       const k = U.randi(0, 2), a = amp != null ? amp : (5 + 10 * sev);
       add(rectSoft(1, k * 40 + 1, W - 2, k * 40 + 39, a, 0.8));
@@ -81,6 +86,7 @@ const VIS = (() => {
 
     if (scene === 'shading') doShading(sev > 0.75 ? 2 : 1);
     else if (scene === 'junction') doJunction();
+    else if (scene === 'connector') doConnector();
     else if (scene === 'bypass') doBypass();
     else if (scene === 'crack') doCrack();
     else if (scene === 'soiling') doSoiling();
@@ -225,6 +231,22 @@ const VIS = (() => {
     return { g: 4, name: 'Ⅳ级 紧急处置', lv: 'red' };
   }
 
+  /* 热异常位置：部位 + 坐标（电池片行列 / 像素） */
+  function partOf(r, w, h, grid) {
+    const cls = CLS[r.cls];
+    if (!grid) return { part: cls === 'junction' ? '接点' : '图像区域', pos: `(${r.cx.toFixed(0)}, ${r.cy.toFixed(0)}) px` };
+    const col = Math.min(10, Math.floor(r.cx / CW) + 1), row = Math.min(6, Math.floor(r.cy / CH) + 1);
+    const cell = `第 ${row} 行 · 第 ${col} 片`;
+    if (cls === 'junction') {
+      const d = Math.hypot(r.cx - JB.x * w / W, r.cy - JB.y * h / H);
+      return d < 8 ? { part: '接线盒', pos: '组件背面中上部' } : { part: '连接器(MC4)', pos: `接线盒${r.cx < JB.x ? '左' : '右'}侧引出线` };
+    }
+    if (cls === 'bypass') return { part: '子串（旁路二极管）', pos: `子串 ${Math.min(3, Math.floor(r.cy / (h / 3)) + 1)}` };
+    if (cls === 'soiling') return { part: '下边框', pos: `第 6 行，跨 ${Math.round(r.widthFrac * 10)} 片` };
+    if (cls === 'reflect') return { part: '玻璃表面（反光）', pos: cell };
+    return { part: '电池片', pos: cell };
+  }
+
   /* 上传图片 → 伪温度场 */
   function fromImage(img, Tmin, Tmax, maxW = 240) {
     const sc = Math.min(1, maxW / img.width);
@@ -239,6 +261,6 @@ const VIS = (() => {
     return { T, W: w, H: h };
   }
 
-  return { W, H, CW, CH, CLS, CLS_NAMES, CLS_COLORS, SCENES, synth, analyze, gradeOf, fromImage };
+  return { W, H, CW, CH, CLS, CLS_NAMES, CLS_COLORS, SCENES, synth, analyze, gradeOf, fromImage, partOf };
 })();
 if (typeof module !== 'undefined') module.exports = VIS;

@@ -1,7 +1,7 @@
 'use strict';
-/* 电弧故障诊断页 + 全局共享的电弧判别模型 */
+/* 模块③ 直流电弧故障诊断：采样要求核验 → 多域特征 → 神经网络判别 → 疑似电弧事件（异常时段、关联回路、诊断证据） */
 const Arc = (() => {
-  const st = { model: null, scaler: null, ready: false, training: false, hist: { loss: [], acc: [] }, eval: null, imp: null, cur: null, stream: null, meta: null };
+  const st = { model: null, scaler: null, ready: false, training: false, hist: { loss: [], acc: [] }, eval: null, imp: null, cur: null, stream: null, meta: null, norm: null };
   const DOMAIN = i => i < 5 ? '时域' : i < 10 ? '频域' : i < 13 ? '谱统计' : '小波';
 
   function init() {
@@ -11,6 +11,7 @@ const Arc = (() => {
     U.range('arc-I', v => v.toFixed(1) + ' A');
     U.range('arc-sev', v => v.toFixed(2));
     U.range('arc-noise', v => v.toFixed(1) + '×');
+    U.range('arc-loss', v => v.toFixed(1) + '%');
     U.$('#arc-gen').onclick = diagnose;
     U.$('#arc-rand').onclick = () => {
       sel.value = U.pick(DSP.CLASSES);
@@ -18,7 +19,7 @@ const Arc = (() => {
       ['arc-I', 'arc-sev'].forEach(id => U.$('#' + id).dispatchEvent(new Event('input')));
       diagnose();
     };
-    U.$('#arc-train').onclick = () => train();
+    U.$('#arc-train').onclick = () => { if (DATA.guard('model')) { DATA.audit('电弧模型重新训练', `每类 ${U.$('#arc-n').value} 样本，隐层 ${U.$('#arc-h').value}`); train(); } };
     U.$('#arc-stream').onclick = stream;
   }
 
@@ -29,6 +30,39 @@ const Arc = (() => {
     return { probs: st.model.predict(st.scaler.transform(f)), f, ready: true };
   }
   const arcProb = p => p[1] + p[2];
+
+  /* 诊断证据：相对正常工况分布偏离最大的特征（z 分数） */
+  function evidence(f, k = 3) {
+    if (!st.norm) return [];
+    return f.map((v, i) => ({ i, name: DSP.FEATURE_NAMES[i], dom: DOMAIN(i), v, z: (v - st.norm.mu[i]) / st.norm.sd[i] }))
+      .sort((a, b) => Math.abs(b.z) - Math.abs(a.z)).slice(0, k);
+  }
+  const evTxt = ev => ev.map(e => `${e.name} ${e.z >= 0 ? '+' : ''}${e.z.toFixed(1)}σ`).join('、');
+
+  /* 采样要求核验：采样率、窗长、数据完整率、量程饱和 */
+  const REQ = { fs: 200000, winMs: 10, comp: 0.99, clip: 0.005 };
+  function sampleCheck(x, fsDev) {
+    let run = 0, missing = 0, mx = -Infinity, nClip = 0;
+    for (let i = 1; i < x.length; i++) { if (x[i] === x[i - 1]) { run++; if (run === 4) missing += 4; else if (run > 4) missing++; } else run = 0; }
+    for (const v of x) mx = Math.max(mx, v);
+    for (const v of x) if (v >= mx - 1e-9) nClip++;
+    const comp = 1 - missing / x.length, clip = nClip / x.length, winMs = x.length / DSP.FS * 1000;
+    const items = [
+      ['采样率', `${fsDev / 1000} kHz`, `≥ ${REQ.fs / 1000} kHz`, fsDev >= REQ.fs],
+      ['窗长', `${winMs.toFixed(2)} ms`, `≥ ${REQ.winMs} ms`, winMs >= REQ.winMs],
+      ['数据完整率', `${(comp * 100).toFixed(2)}%`, `≥ ${REQ.comp * 100}%`, comp >= REQ.comp],
+      ['量程饱和/削波', `${(clip * 100).toFixed(2)}%`, `≤ ${REQ.clip * 100}%`, clip <= REQ.clip]
+    ];
+    return { items, ok: items.every(i => i[3]) };
+  }
+  function degrade(x, loss, sat, I0) {
+    if (loss > 0) {
+      const nGap = Math.max(1, Math.round(x.length * loss / 100 / 24));
+      for (let g = 0; g < nGap; g++) { const a = U.randi(1, x.length - 30); for (let i = a; i < a + 24; i++) x[i] = x[a - 1]; }
+    }
+    if (sat) { const lim = I0 * 1.004; for (let i = 0; i < x.length; i++) x[i] = Math.min(x[i], lim); }
+    return x;
+  }
 
   async function train() {
     if (st.training) return;
@@ -60,6 +94,11 @@ const Arc = (() => {
       if (e % 4 === 3 || e === epochs - 1) { info.textContent = `训练中：第 ${e + 1}/${epochs} 轮，损失 ${loss.toFixed(4)}，测试准确率 ${(ev.acc * 100).toFixed(1)}%`; drawCurve(); await U.sleep(0); }
     }
     st.model = model; st.scaler = scaler; st.ready = true;
+    const Xn = X.filter((_, i) => Y[i] === 0), d = X[0].length;
+    const mu = new Array(d).fill(0), sd = new Array(d).fill(0);
+    Xn.forEach(x => x.forEach((v, j) => mu[j] += v / Xn.length));
+    Xn.forEach(x => x.forEach((v, j) => sd[j] += (v - mu[j]) ** 2 / Xn.length));
+    st.norm = { mu, sd: sd.map(v => Math.sqrt(v) + 1e-6) };
     st.eval = model.evaluate(Xte, Yte);
     info.textContent = '计算置换特征重要性 …'; await U.sleep(0);
     st.imp = ML.permutationImportance(model, Xte, Yte, 2);
@@ -118,20 +157,24 @@ const Arc = (() => {
   }
 
   function currentParams() {
-    return { type: U.$('#arc-type').value, I0: +U.$('#arc-I').value, sev: +U.$('#arc-sev').value, noise: +U.$('#arc-noise').value };
+    return { type: U.$('#arc-type').value, I0: +U.$('#arc-I').value, sev: +U.$('#arc-sev').value, noise: +U.$('#arc-noise').value,
+      fsDev: +U.$('#arc-fs').value, loss: +U.$('#arc-loss').value, sat: U.$('#arc-sat').checked };
   }
 
   function diagnose() {
     const p = currentParams();
     const g = DSP.generate(p.type, { I0: p.I0, sev: p.sev, noise: p.noise });
+    degrade(g.x, p.loss, p.sat, p.I0);
+    const chk = sampleCheck(g.x, p.fsDev);
     const r = classify(g.x);
-    st.cur = { ...p, x: g.x, onset: g.onset, probs: r.probs, f: r.f };
+    st.cur = { ...p, x: g.x, onset: g.onset, probs: r.probs, f: r.f, chk };
     renderResult();
   }
 
   function renderResult() {
     const c = st.cur; if (!c) return;
     if (st.ready) { const r = classify(c.x); c.probs = r.probs; c.f = r.f; }
+    U.$('#arc-chk').innerHTML = c.chk.items.map(([k, v, th, ok]) => `<tr><td>${k}</td><td>${v}</td><td class="muted">${th}</td><td>${ok ? U.tag('满足', 'ok') : U.tag('不满足', 'red')}</td></tr>`).join('');
     const t = Array.from(c.x, (_, i) => i / DSP.FS * 1000);
     U.lineChart(U.$('#arc-wave'), {
       series: [{ y: Array.from(c.x), x: t, color: '#22d3ee', width: 1, label: '组串电流 I(t)' }],
@@ -150,11 +193,19 @@ const Arc = (() => {
 
   function renderProbs() {
     const c = st.cur;
-    if (!st.ready) { U.$('#arc-verdict').innerHTML = '<span class="muted">模型训练中…</span>'; U.$('#arc-probs').innerHTML = ''; return; }
+    if (!st.ready) { U.$('#arc-verdict').innerHTML = '<span class="muted">模型训练中…</span>'; U.$('#arc-probs').innerHTML = ''; U.$('#arc-evid').innerHTML = ''; return; }
+    if (!c.chk.ok) {
+      U.$('#arc-verdict').innerHTML = `<span style="color:#fbbf24">信号不满足采样要求</span> ${U.tag('不予判别', 'orange')}`;
+      U.$('#arc-probs').innerHTML = `<div class="hint">未通过项：${c.chk.items.filter(i => !i[3]).map(i => i[0]).join('、')}。为避免误判，仅对满足采样要求的电气信号进行电弧诊断，请检查采集设备。</div>`;
+      U.$('#arc-evid').innerHTML = '';
+      return;
+    }
     const best = c.probs.indexOf(Math.max(...c.probs));
-    const pa = arcProb(c.probs);
-    const lv = pa > 0.6 ? 'red' : pa > 0.3 ? 'orange' : 'ok';
-    U.$('#arc-verdict').innerHTML = `<span style="color:${DSP.CLASS_COLORS[best]}">${DSP.CLASS_NAMES[best]}</span> ${U.tag(pa > 0.6 ? '电弧告警' : pa > 0.3 ? '疑似电弧' : '无电弧', lv)}`;
+    const pa = arcProb(c.probs), C = FUSE.CFG;
+    const lv = pa >= C.pArc ? 'red' : pa >= C.pSus ? 'orange' : 'ok';
+    U.$('#arc-verdict').innerHTML = `<span style="color:${DSP.CLASS_COLORS[best]}">${DSP.CLASS_NAMES[best]}</span> ${U.tag(pa >= C.pArc ? '疑似电弧（待连续窗确认）' : pa >= C.pSus ? '疑似电弧（低）' : '无电弧特征', lv)}`;
+    U.$('#arc-evid').innerHTML = `<div class="muted" style="font-size:12px;margin:8px 0 4px">诊断证据（相对正常工况偏离最大的特征）</div>` +
+      evidence(c.f, 4).map(e => `<div class="pr"><span>${e.name}<span class="muted">·${e.dom}</span></span><div class="bar"><i style="width:${Math.min(100, Math.abs(e.z) * 8).toFixed(0)}%;background:${e.z > 0 ? '#f97316' : '#38bdf8'}"></i></div><span style="text-align:right">${e.z >= 0 ? '+' : ''}${e.z.toFixed(1)}σ</span></div>`).join('');
     U.$('#arc-probs').innerHTML = c.probs.map((p, i) => `<div class="pr"><span>${DSP.CLASS_NAMES[i]}</span><div class="bar"><i style="width:${(p * 100).toFixed(1)}%;background:${DSP.CLASS_COLORS[i]}"></i></div><span style="text-align:right">${(p * 100).toFixed(1)}%</span></div>`).join('') +
       `<div class="hint" style="margin-top:6px">真实工况：${DSP.CLASS_NAMES[DSP.CLASSES.indexOf(c.type)]}</div>`;
   }
@@ -185,6 +236,7 @@ const Arc = (() => {
       <div class="k">背景工况 / 电弧强度</div><div class="v">${DSP.CLASS_NAMES[DSP.CLASSES.indexOf(base)]} / ${p.sev.toFixed(2)}</div>
       <div class="k">电弧起始时刻</div><div class="v">${tOn.toFixed(1)} ms</div>
       <div class="k">确认检出时刻</div><div class="v">${tDet != null ? tDet.toFixed(1) + ' ms' : '未检出'}</div>
+      <div class="k">异常时段</div><div class="v">${tDet != null ? `${tOn.toFixed(1)} – ${(nW * winMs).toFixed(1)} ms（至窗口末）` : '—'}</div>
       <div class="k">检测延时</div><div class="v"><b>${delay != null ? delay.toFixed(1) + ' ms' : '—'}</b></div>
       <div class="k">检出前电弧能量（弧压≈${Varc.toFixed(0)} V）</div><div class="v"><b>${E != null ? E.toFixed(2) + ' J' : '—'}</b></div>
       <div class="k">起弧前误报次数</div><div class="v">${falseAlarm}</div>
@@ -214,8 +266,19 @@ const Arc = (() => {
     for (let t = 0; t <= n * s.winMs; t += 100) ctx.fillText(t + ' ms', Math.min(w - 24, X(t)), h - 8);
   }
 
-  function drawAll() { drawCurve(); drawCM(); drawImp(); drawStream(); if (st.cur) renderResult(); }
-  function onShow() { if (!st.cur && st.ready) diagnose(); if (!st.stream && st.ready) stream(); drawAll(); }
+  /* 疑似电弧事件：异常时段、关联回路与诊断证据（来自在线监测） */
+  function live() {
+    const S = Station.state(), segs = S.arcSegs;
+    const ft = s => s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`;
+    U.$('#arc-segs').innerHTML = segs.slice(0, 40).map(g => {
+      const end = g.end != null ? g.end : S.t, ev = S.events.find(e => e.key === g.locate && e.tStart <= end && e.tLast >= g.start - 2);
+      return `<tr><td><b>${g.id}</b><div class="muted" style="font-size:11px">${g.loop}</div></td><td>${U.hms(11 * 3600 + g.start)} – ${g.end != null ? U.hms(11 * 3600 + g.end) : '<span style="color:#f97316">持续中</span>'}<div class="muted" style="font-size:11px">${ft(end - g.start)}</div></td>
+        <td>${(g.peak * 100).toFixed(0)}%</td><td>${g.confirmed ? U.tag('连续窗确认', 'red') : U.tag('疑似', 'orange')}</td><td>${g.locate || '—'}</td><td class="muted" style="font-size:12px">${g.cls}；${evTxt(g.evidence)}</td><td>${ev ? ev.id : '—'}</td></tr>`;
+    }).join('') || '<tr><td colspan="7" class="muted">暂无疑似电弧事件。可在模块①加载“场景C：连接器松动 → 串联电弧”或在阵列中注入连接器串联电弧。</td></tr>';
+  }
 
-  return { init, train, classify, arcProb, onShow, get ready() { return st.ready; }, get meta() { return st.meta; }, get state() { return st; } };
+  function drawAll() { drawCurve(); drawCM(); drawImp(); drawStream(); if (st.cur) renderResult(); }
+  function onShow() { if (!st.cur && st.ready) diagnose(); if (!st.stream && st.ready) stream(); drawAll(); Station.stringsPanel(); live(); }
+
+  return { init, train, classify, arcProb, evidence, live, onShow, get ready() { return st.ready; }, get meta() { return st.meta; }, get state() { return st; } };
 })();
