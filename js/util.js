@@ -112,7 +112,7 @@ const U = (() => {
     const X = v => m.l + (v - xMin) / (xMax - xMin) * pw;
     const Y = v => m.t + (1 - (v - yMin) / (yMax - yMin)) * ph;
     ctx.font = C.font; ctx.lineWidth = 1;
-    const ys = niceStep(yMax - yMin, 5);
+    const ys = niceStep(yMax - yMin, opt.yTicks || 5);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     for (let v = Math.ceil(yMin / ys) * ys; v <= yMax + 1e-9; v += ys) {
       ctx.strokeStyle = C.grid; ctx.beginPath(); ctx.moveTo(m.l, Y(v)); ctx.lineTo(w - m.r, Y(v)); ctx.stroke();

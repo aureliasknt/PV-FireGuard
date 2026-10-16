@@ -20,23 +20,23 @@
 <div class="layout">
   <nav class="side" id="nav">
     <div class="navgroup">五大功能模块</div>
-    <button data-page="station" class="active"><span class="ic">①</span>电站可视化与状态监测</button>
-    <button data-page="hotspot"><span class="ic">②</span>热异常与热斑诊断</button>
-    <button data-page="arc"><span class="ic">③</span>直流电弧故障诊断</button>
-    <button data-page="risk"><span class="ic">④</span>电—热融合风险评估与预警</button>
-    <button data-page="report"><span class="ic">⑤</span>事件管理与诊断报告</button>
+    <button data-page="station" class="active"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M6.5 11h2.5l1.5-3 3 6 1.5-3h2.5"/><path d="M9 21h6M12 17v4"/></svg></span>电站可视化与状态监测</button>
+    <button data-page="hotspot"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/><circle cx="12" cy="17.5" r="1.2" fill="currentColor"/></svg></span>热异常与热斑诊断</button>
+    <button data-page="arc"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></span>直流电弧故障诊断</button>
+    <button data-page="risk"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.5 5.8v5.7c0 4.6 3.1 8.4 7.5 9.7 4.4-1.3 7.5-5.1 7.5-9.7V5.8z"/><path d="M12 8v5"/><circle cx="12" cy="16.3" r="1" fill="currentColor"/></svg></span>电—热融合风险评估与预警</button>
+    <button data-page="report"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span>事件管理与诊断报告</button>
     <div class="navgroup">支撑</div>
-    <button data-page="data"><span class="ic">▦</span>后台数据支撑层</button>
-    <button data-page="about"><span class="ic">ⓘ</span>项目与技术</button>
+    <button data-page="data"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/></svg></span>后台数据支撑层</button>
+    <button data-page="about"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="1" fill="currentColor"/></svg></span>项目与技术</button>
     <div class="navnote">以<b>电—热融合</b>为核心，实现光伏直流侧故障诊断、火灾预警与全过程事件追溯。<br><br>所有算法均在浏览器本地运行，无需联网与安装。</div>
   </nav>
 
   <main>
   <!-- ================= ① 电站可视化与状态监测 ================= -->
   <section class="page active" id="page-station">
-    <div class="page-title"><h2>① 电站可视化与状态监测</h2><p>建立设备与测点关联，展示电压、电流、温度和在线状态 · 28.8 kWp 示范阵列（6 组串 × 12 块 400 W 组件）</p></div>
-    <div class="outline">输出：<b>电站总览</b> · <b>异常分布</b> · <b>历史趋势</b></div>
-    <div class="grid kpis">
+    <div class="page-title st-title"><h2>① 电站可视化与状态监测</h2><p>建立设备与测点关联，展示电压、电流、温度和在线状态</p>
+      <div class="outline">输出：<b>电站总览</b> · <b>异常分布</b> · <b>历史趋势</b></div></div>
+    <div class="grid kpis compact">
       <div class="card kpi"><div class="l">实时发电功率</div><div class="v" id="k-power">—</div><div class="s" id="k-power-s">—</div></div>
       <div class="card kpi"><div class="l">组件最高温度</div><div class="v" id="k-tmax">—</div><div class="s" id="k-tmax-s">—</div></div>
       <div class="card kpi" style="--kc:rgba(249,115,22,.22)"><div class="l">活动预警组件</div><div class="v" id="k-alarms">0</div><div class="s" id="k-alarms-s">—</div></div>
@@ -45,21 +45,21 @@
       <div class="card kpi"><div class="l">测点在线</div><div class="v" id="k-online">—</div><div class="s" id="k-online-s">—</div></div>
     </div>
 
-    <div class="grid main-side">
-      <div class="card">
+    <!-- 首屏：阵列热像 + 趋势 + 告警/证据（1440×900 与 1920×1080 下无需滚动） -->
+    <div class="st-main">
+      <div class="card st-array">
         <div class="card-head">
-          <h3>阵列实时态势 <span class="sub">点击组件注入故障或查看测点详情</span></h3>
+          <h3>阵列实时态势 <span class="sub">28.8 kWp · 6 组串 × 12 块 · 点击组件查看详情或注入故障</span></h3>
           <div class="row">
             <div class="seg" id="st-view"><button data-v="thermal" class="on">红外热像</button><button data-v="risk">异常分布</button></div>
             <div class="seg" id="st-speed"><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="5">5×</button><button data-s="10">10×</button></div>
             <button class="btn sm" id="st-play">⏸ 暂停</button>
           </div>
         </div>
-        <canvas id="st-canvas"></canvas>
+        <div class="canvas-box"><canvas id="st-canvas"></canvas></div>
         <div class="row toolbar">
-          <label class="muted">点击工具</label>
-          <select id="st-tool">
-            <option value="select">仅选中查看</option>
+          <select id="st-tool" title="点击工具">
+            <option value="select">点击：仅选中查看</option>
             <option value="shading">注入：遮挡热斑</option>
             <option value="soiling">注入：积灰污损</option>
             <option value="crack">注入：电池隐裂</option>
@@ -69,7 +69,7 @@
             <option value="reflect">注入：反光干扰（误报测试）</option>
             <option value="clear">清除故障</option>
           </select>
-          <label class="muted">严重度</label><input type="range" id="st-sev" min="0.1" max="1" step="0.05" value="0.8" style="width:110px"><b id="st-sev-v">0.80</b>
+          <label class="muted">严重度</label><input type="range" id="st-sev" min="0.1" max="1" step="0.05" value="0.8" style="width:90px"><b id="st-sev-v">0.80</b>
           <span style="flex:1"></span>
           <select id="st-scenario">
             <option value="">— 复杂故障场景库 —</option>
@@ -80,45 +80,50 @@
             <option value="E">场景E：反光 + 逆变器噪声（误报抑制）</option>
           </select>
           <button class="btn primary sm" id="st-load">加载场景</button>
-          <label class="chk"><input type="checkbox" id="st-auto" checked>自动联动处置(RSD)</label>
+          <label class="chk"><input type="checkbox" id="st-auto" checked>自动联动(RSD)</label>
           <button class="btn sm" id="st-reset">复位</button>
         </div>
       </div>
-      <div>
-        <div class="card" style="margin-bottom:14px">
-          <h3>环境工况 <span class="sub">气象站 WS-01</span></h3>
-          <label class="f"><div class="lab">太阳辐照度 G<b id="ev-G-v"></b></div><input type="range" id="ev-G" min="0" max="1200" step="10" value="900"></label>
-          <label class="f"><div class="lab">环境温度 Ta<b id="ev-Ta-v"></b></div><input type="range" id="ev-Ta" min="-10" max="45" step="1" value="30"></label>
-          <label class="f"><div class="lab">风速 v<b id="ev-v-v"></b></div><input type="range" id="ev-v" min="0" max="12" step="0.5" value="2"></label>
-          <label class="f"><div class="lab">风向（吹向）<b id="ev-dir-v"></b></div><input type="range" id="ev-dir" min="0" max="345" step="15" value="0"></label>
-          <label class="f"><div class="lab">相对湿度 RH<b id="ev-RH-v"></b></div><input type="range" id="ev-RH" min="10" max="95" step="1" value="45"></label>
-          <label class="f"><div class="lab">组件下方可燃物堆积<b id="ev-debris-v"></b></div><input type="range" id="ev-debris" min="0" max="1" step="0.05" value="0.2"></label>
-          <label class="chk"><input type="checkbox" id="ev-inv">逆变器强电磁噪声</label>
+      <div class="st-side">
+        <div class="card st-trend">
+          <div class="card-head"><h3>历史趋势 <span class="sub">1 Hz</span></h3><div class="seg" id="st-win"><button data-w="5" class="on">5 min</button><button data-w="15">15 min</button><button data-w="30">30 min</button></div></div>
+          <canvas id="st-trend-T"></canvas>
+          <canvas id="st-trend-P"></canvas>
+          <canvas id="st-trend-R"></canvas>
         </div>
-        <div class="card" id="st-detail"></div>
+        <div class="card st-alarm">
+          <div class="card-head"><div class="seg" id="st-rtab"><button data-t="alarms" class="on">告警与证据</button><button data-t="detail">组件详情</button></div><span class="muted" style="font-size:11.5px">处理见模块⑤</span></div>
+          <div class="st-rpanel" id="st-rp-alarms"><div class="alist" id="st-alarms"></div></div>
+          <div class="st-rpanel" id="st-rp-detail" style="display:none"><div id="st-detail"></div></div>
+        </div>
       </div>
     </div>
 
-    <div class="grid g2">
-      <div class="card">
-        <h3>设备与测点状态 <span class="sub">组串 ↔ 汇流箱 / MPPT ↔ 测点（电流 CT · 电压 VT · 热电偶 TC · 红外 IR）</span></h3>
-        <div class="tablewrap" style="max-height:none"><table class="t"><thead><tr><th>组串</th><th>回路</th><th>电压</th><th>电流</th><th>功率</th><th>最高温度</th><th>测点在线</th><th>状态</th></tr></thead><tbody id="st-dev"></tbody></table></div>
-        <div class="hint" style="margin-top:6px"><span class="dot on"></span>在线 <span class="dot warn"></span>质量异常 <span class="dot off"></span>离线 · 测点依次为 CT / VT / TC / IR，可在“后台数据支撑层”模拟通信中断或时钟漂移。</div>
+    <!-- 首屏以下：工况、设备测点、异常分布与完整日志 -->
+    <div class="card st-more">
+      <div class="card-head"><div class="seg" id="st-btab">
+        <button data-t="dev" class="on">设备与测点状态</button><button data-t="env">环境工况</button><button data-t="dist">异常分布统计</button><button data-t="log">完整告警日志</button></div>
+        <div class="row" id="st-log-tools" style="display:none"><button class="btn sm" id="st-csv">导出 CSV</button><button class="btn sm" id="st-clearlog">清空</button></div></div>
+      <div class="st-bpanel" id="st-bp-dev">
+        <div class="hint" style="margin-bottom:6px">组串 ↔ 汇流箱 / MPPT ↔ 测点（电流 CT · 电压 VT · 热电偶 TC · 红外 IR） · <span class="dot on"></span>在线 <span class="dot warn"></span>质量异常 <span class="dot off"></span>离线，可在“后台数据支撑层”模拟通信中断或时钟漂移。</div>
+        <div class="tablewrap" style="max-height:none"><table class="t"><thead><tr><th>组串</th><th>回路</th><th>电压</th><th>电流</th><th>功率</th><th>最高温度</th><th>测点在线 CT/VT/TC/IR</th><th>状态</th></tr></thead><tbody id="st-dev"></tbody></table></div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>历史趋势 <span class="sub">1 Hz 时序</span></h3><div class="seg" id="st-win"><button data-w="5" class="on">5 min</button><button data-w="15">15 min</button><button data-w="30">30 min</button></div></div>
-        <canvas id="st-trend-T" style="height:105px"></canvas>
-        <canvas id="st-trend-P" style="height:105px;margin-top:4px"></canvas>
-        <canvas id="st-trend-R" style="height:105px;margin-top:4px"></canvas>
+      <div class="st-bpanel env-grid" id="st-bp-env" style="display:none">
+        <label class="f"><div class="lab">太阳辐照度 G<b id="ev-G-v"></b></div><input type="range" id="ev-G" min="0" max="1200" step="10" value="900"></label>
+        <label class="f"><div class="lab">环境温度 Ta<b id="ev-Ta-v"></b></div><input type="range" id="ev-Ta" min="-10" max="45" step="1" value="30"></label>
+        <label class="f"><div class="lab">风速 v<b id="ev-v-v"></b></div><input type="range" id="ev-v" min="0" max="12" step="0.5" value="2"></label>
+        <label class="f"><div class="lab">风向（吹向）<b id="ev-dir-v"></b></div><input type="range" id="ev-dir" min="0" max="345" step="15" value="0"></label>
+        <label class="f"><div class="lab">相对湿度 RH<b id="ev-RH-v"></b></div><input type="range" id="ev-RH" min="10" max="95" step="1" value="45"></label>
+        <label class="f"><div class="lab">组件下方可燃物堆积<b id="ev-debris-v"></b></div><input type="range" id="ev-debris" min="0" max="1" step="0.05" value="0.2"></label>
+        <label class="chk"><input type="checkbox" id="ev-inv">逆变器强电磁噪声</label>
+        <div class="hint">数据来源：气象站 WS-01</div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h3>实时告警流 <span class="sub">事件确认、处理与复核见模块⑤</span></h3><div class="row"><button class="btn sm" id="st-csv">导出 CSV</button><button class="btn sm" id="st-clearlog">清空</button></div></div>
-      <div class="tablewrap"><table class="t"><thead><tr><th style="width:80px">时间</th><th style="width:90px">位置</th><th>告警</th><th style="width:96px">等级</th><th style="width:70px">置信度</th><th>触发原因 / 处置</th></tr></thead><tbody id="st-log"></tbody></table></div>
+      <div class="st-bpanel" id="st-bp-dist" style="display:none"><div id="st-dist"></div></div>
+      <div class="st-bpanel" id="st-bp-log" style="display:none">
+        <div class="tablewrap"><table class="t"><thead><tr><th style="width:80px">时间</th><th style="width:90px">位置</th><th>告警</th><th style="width:96px">等级</th><th style="width:70px">置信度</th><th>触发原因 / 处置</th></tr></thead><tbody id="st-log"></tbody></table></div>
+      </div>
     </div>
   </section>
-
   <!-- ================= ② 热异常与热斑诊断 ================= -->
   <section class="page" id="page-hotspot">
     <div class="page-title"><h2>② 热异常与热斑诊断</h2><p>分析组件、连接器等部位的热点、温差及温升过程 · 红外热像 → 灰度化 → 卷积特征 → 候选区域 + NMS → 分类与分级</p></div>

@@ -18,11 +18,11 @@ header.top { height: 58px; display: flex; align-items: center; gap: 14px; paddin
 .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; box-shadow: 0 0 0 0 rgba(34,197,94,.6); animation: pulse 1.6s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(34,197,94,0); } 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); } }
 
-.layout { display: grid; grid-template-columns: 232px 1fr; height: calc(100vh - 58px); }
+.layout { display: grid; grid-template-columns: 248px 1fr; height: calc(100vh - 58px); }
 nav.side { background: #0c1528; border-right: 1px solid var(--line); padding: 12px 10px; overflow: auto; }
-nav.side button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; margin-bottom: 4px;
+nav.side button { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; padding: 10px 10px; margin-bottom: 4px; white-space: nowrap; font-size: 13.5px;
   background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 8px; cursor: pointer; font: inherit; }
-nav.side button .ic { width: 22px; text-align: center; font-size: 15px; }
+nav.side button .ic { flex: none; width: 20px; display: inline-grid; place-items: center; text-align: center; font-size: 15px; }
 nav.side button:hover { background: var(--panel); color: var(--text); }
 nav.side button.active { background: linear-gradient(90deg, rgba(34,211,238,.16), rgba(34,211,238,.02)); border-color: rgba(34,211,238,.35); color: #e6fbff; }
 nav.side .navnote { margin-top: 16px; padding: 10px; font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--line); line-height: 1.6; }
@@ -79,7 +79,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 canvas { display: block; width: 100%; }
 canvas.img { height: auto; border-radius: 6px; background: #000; image-rendering: auto; }
-#st-canvas { height: 430px; cursor: crosshair; border-radius: 8px; }
+#st-canvas { cursor: crosshair; border-radius: 8px; }
 .toolbar { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 
 table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -207,3 +207,52 @@ ul.why { margin: 0; padding-left: 4px; list-style: none; line-height: 2; font-si
 @media (max-width: 1280px) { .mods { grid-template-columns: repeat(3, 1fr); } .ev-grid { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .mods, .layer, .kpis5, .cfg-grid { grid-template-columns: 1fr 1fr; } nav.side .navgroup { display: none; } }
 @media print { #ev-panel-report { display: block !important; } #ev-panel-events { display: none !important; } }
+
+/* ---------- 模块①：首屏布局（1440×900 / 1920×1080 无需滚动） ---------- */
+.st-title { align-items: center; margin: 0 0 10px; min-width: 0; }
+.st-title p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.st-title .outline { margin: 0 0 0 auto; flex: none; padding: 2px 10px; }
+.kpis.compact { gap: 10px; margin-bottom: 10px; }
+.kpis.compact .kpi { padding: 8px 12px; }
+.kpis.compact .kpi .l { font-size: 11.5px; }
+.kpis.compact .kpi .v { font-size: 20px; margin-top: 1px; line-height: 1.25; }
+.kpis.compact .kpi .s { font-size: 11px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-main { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 31%, 480px); gap: 12px; margin-bottom: 14px;
+  height: calc(100vh - 58px - 16px - 40px - 72px - 14px); min-height: 520px; }
+.st-array { display: flex; flex-direction: column; min-height: 0; padding: 12px; }
+.st-array .card-head { margin-bottom: 6px; }
+.canvas-box { position: relative; flex: 1 1 0; min-height: 200px; }
+.canvas-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.st-array .toolbar { margin-top: 8px; padding-top: 8px; gap: 6px; }
+.st-array .toolbar #st-scenario { max-width: 200px; }
+.st-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.st-trend { flex: none; padding: 10px 12px; }
+.st-trend .card-head { margin-bottom: 4px; }
+.st-trend canvas { height: 84px; }
+.st-trend canvas + canvas { margin-top: 2px; }
+.st-alarm { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; padding: 10px 12px; }
+.st-alarm .card-head { margin-bottom: 6px; }
+.st-rpanel { flex: 1 1 0; min-height: 0; overflow: auto; }
+.alist .ai { padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.alist .ai:last-child { border-bottom: 0; }
+.alist .ai .h { display: flex; align-items: center; gap: 6px; }
+.alist .ai .h b { white-space: nowrap; }
+.alist .ai .h .ty { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alist .ai .h .tm { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.alist .ai .ev { color: var(--muted); font-size: 11.5px; line-height: 1.5; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.alist .ai.act { cursor: pointer; } .alist .ai.act:hover { background: rgba(148,163,184,.05); }
+.st-more .card-head { margin-bottom: 10px; }
+.env-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 18px; align-items: end; }
+@media (max-width: 1280px) { .kpis.compact { grid-template-columns: repeat(6, 1fr); } }
+@media (max-width: 1000px) {
+  .st-main { grid-template-columns: 1fr; height: auto; }
+  .canvas-box { flex: none; height: 380px; }
+  .st-alarm { flex: none; height: 360px; }
+  .kpis.compact { grid-template-columns: 1fr 1fr; }
+  .env-grid { grid-template-columns: 1fr 1fr; }
+  .st-title { flex-wrap: wrap; } .st-title .outline { margin-left: 0; }
+}
+
+/* 侧边栏模块图标（内联 SVG，随按钮颜色变化） */
+nav.side button .ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+nav.side button.active .ic svg { stroke: var(--accent); }

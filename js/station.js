@@ -21,6 +21,7 @@ const Station = (() => {
       S.strings.push({ idx: r, id: `S${r + 1}`, shutdown: false, I: 0, V: 0, pArc: 0, hits: 0, arc: false, cls: 0, probs: null, arcSince: null, locate: null, seg: null, noData: false, rsdAt: null });
       for (let c = 0; c < COLS; c++) S.modules.push(mkModule(r, c));
     }
+    S.btab = S.btab || 'dev';
     S.t = 0; S.log = []; S.frames = []; S.events = []; S.evSeq = 0; S.arcSegs = []; S.sel = null;
     S.stats = { blocked: 0, ignitions: 0, leads: [], suppressed: 0 };
   }
@@ -391,13 +392,14 @@ const Station = (() => {
     if (s) drawArray(s);
     header();
     kpis(); devTable(); detail();
-    if (S.logDirty) { logTable(); S.logDirty = false; }
+    if (S.btab === 'dist') U.$('#st-dist').innerHTML = distribution();
+    if (S.logDirty) { alarmList(); if (S.btab === 'log') logTable(); S.logDirty = false; }
     if (S.frame++ % 2 === 0) trend();
   }
 
   function drawArray({ ctx, w, h }) {
     const m = { l: 44, r: 16, t: 30, b: 34 }, gap = 6;
-    const mw = (w - m.l - m.r - gap * (COLS - 1)) / COLS, mh = Math.min(70, (h - m.t - m.b - gap * (ROWS - 1)) / ROWS);
+    const mw = (w - m.l - m.r - gap * (COLS - 1)) / COLS, mh = Math.min(96, (h - m.t - m.b - gap * (ROWS - 1)) / ROWS);
     const top = m.t + ((h - m.t - m.b) - (mh * ROWS + gap * (ROWS - 1))) / 2;
     S.layout = { m, gap, mw, mh, top };
     const grd = ctx.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, '#1a2338'); grd.addColorStop(1, '#121a2c');
@@ -532,17 +534,16 @@ const Station = (() => {
     }).join('');
     const types = {};
     S.modules.forEach(m => { if (m.lvIdx >= 1 && m.diag) types[m.diag.name] = (types[m.diag.name] || 0) + 1; });
-    return `<h3>异常分布 <span class="sub">按组串 / 预警等级统计</span></h3>
-      <table class="t"><thead><tr><th>组串</th><th>蓝</th><th>黄</th><th>橙</th><th>红</th><th>过火</th><th>电弧</th><th>ΔTmax</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="hint" style="margin-top:8px">${Object.keys(types).length ? '异常类型：' + Object.entries(types).map(([k, v]) => `${k} ×${v}`).join('；') : '当前无黄色及以上异常。'}<br>点击阵列中任一组件查看测点详情与判据核验。</div>`;
+    return `<table class="t"><thead><tr><th>组串</th><th>蓝</th><th>黄</th><th>橙</th><th>红</th><th>过火</th><th>电弧</th><th>ΔTmax</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="hint" style="margin-top:8px">${Object.keys(types).length ? '异常类型：' + Object.entries(types).map(([k, v]) => `${k} ×${v}`).join('；') : '当前无黄色及以上异常。'}</div>`;
   }
 
   function detail() {
     const m = S.sel, el = U.$('#st-detail');
-    if (!m) { el.innerHTML = distribution(); return; }
+    if (!m) { el.innerHTML = '<div class="hint">在阵列中点击任一组件，或在“告警与证据”中点击告警，查看测点详情与判据核验。</div>'; return; }
     const st = S.strings[m.r], g = m.grade;
     const status = m.burnt ? U.tag('已燃毁', 'info') : m.fire > 0 ? U.tag('燃烧中', 'red') : m.lvIdx >= 1 ? U.tag(U.LEVELS[m.lvIdx].grade + '预警', U.LEVELS[m.lvIdx].key) : U.tag('正常', 'ok');
-    el.innerHTML = `<div class="row sp"><h3 style="margin:0">组件 ${m.id}</h3><span>${status} <button class="btn sm" id="dt-back">返回总览</button></span></div>
+    el.innerHTML = `<div class="row sp"><h3 style="margin:0">组件 ${m.id}</h3><span>${status} <button class="btn sm" id="dt-back">返回告警</button></span></div>
       <div class="kv" style="margin:10px 0">
         <div class="k">关联回路</div><div class="v">${DATA.loopPath(m.r)}</div>
         <div class="k">关联测点</div><div class="v">${dot('CT-S' + (m.r + 1))}CT ${dot('VT-S' + (m.r + 1))}VT ${dot('TC-S' + (m.r + 1))}TC ${dot(DATA.irFor(m.r))}${DATA.irFor(m.r)}</div>
@@ -556,10 +557,32 @@ const Station = (() => {
       </div>
       ${g && g.reasons.length ? `<div class="hint" style="margin-bottom:8px">触发原因：${g.reasons.slice(0, 3).map(r => `${r.by} ${r.txt}`).join('；')}</div>` : ''}
       <div class="row"><button class="btn sm" id="dt-ir">热异常诊断</button><button class="btn sm" id="dt-risk">融合评估</button><button class="btn sm" id="dt-clear">清除故障</button></div>`;
-    U.$('#dt-back').onclick = () => { S.sel = null; render(); };
+    U.$('#dt-back').onclick = () => { S.sel = null; rtab('alarms'); render(); };
     U.$('#dt-ir').onclick = () => { Main.go('hotspot'); Hotspot.loadModule(m); };
     U.$('#dt-risk').onclick = () => { Main.go('risk'); Risk.loadModule(m, S.env, S.auto); };
     U.$('#dt-clear').onclick = () => { inject(m, 'clear'); render(); };
+  }
+
+  /* 首屏：最近告警及其证据（触发原因），不含一般信息 */
+  function alarmList() {
+    const A = S.log.filter(e => e.lv !== 'info').slice(0, 40);
+    U.$('#st-alarms').innerHTML = A.map(e => {
+      const m = S.modules.find(x => x.id === e.loc);
+      return `<div class="ai${m ? ' act' : ''}"${m ? ` data-mod="${e.loc}"` : ''}><div class="h">${U.tag(LVNAME[e.lv] || e.lv, e.lv)}<b>${e.loc}</b><span class="ty">${e.type}</span><span class="tm">${e.time}</span></div>${e.msg ? `<div class="ev">${e.msg}</div>` : ''}</div>`;
+    }).join('') || '<div class="hint" style="padding:8px 4px">暂无告警。可在阵列下方加载“复杂故障场景库”。</div>';
+  }
+  function rtab(t) {
+    U.$$('#st-rtab button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    U.$('#st-rp-alarms').style.display = t === 'alarms' ? '' : 'none';
+    U.$('#st-rp-detail').style.display = t === 'detail' ? '' : 'none';
+  }
+  function btab(t) {
+    S.btab = t;
+    U.$$('#st-btab button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    ['dev', 'env', 'dist', 'log'].forEach(k => { U.$('#st-bp-' + k).style.display = k === t ? '' : 'none'; });
+    U.$('#st-log-tools').style.display = t === 'log' ? '' : 'none';
+    if (t === 'log') logTable();
+    if (t === 'dist') U.$('#st-dist').innerHTML = distribution();
   }
 
   function logTable() {
@@ -569,7 +592,7 @@ const Station = (() => {
   function trend() {
     const W = S.trendWin * 60, F = S.frames.filter(f => f.t > S.t - W);
     if (!F.length) return;
-    const x = F.map(f => (f.t - S.t) / 60), o = { xMin: -S.trendWin, xMax: 0, xFmt: v => v.toFixed(0) + ' min' };
+    const x = F.map(f => (f.t - S.t) / 60), o = { xMin: -S.trendWin, xMax: 0, yTicks: 2, xFmt: v => v.toFixed(0) + ' min' };
     U.lineChart(U.$('#st-trend-T'), { ...o, series: [{ x, y: F.map(f => f.Tmax), color: '#f97316', label: '组件最高温度 ℃', fill: 'rgba(249,115,22,.08)' }] });
     U.lineChart(U.$('#st-trend-P'), { ...o, yMin: 0, series: [{ x, y: F.map(f => f.P), color: '#22d3ee', label: '发电功率 kW', fill: 'rgba(34,211,238,.08)' }] });
     U.lineChart(U.$('#st-trend-R'), { ...o, yMin: 0, series: [{ x, y: F.map(f => f.nAb), color: '#ef4444', label: '黄色及以上异常组件数' }, { x, y: F.map(f => f.risk / 10), color: '#a78bfa', label: '参考风险指数 /10', dash: [4, 3] }] });
@@ -614,8 +637,14 @@ const Station = (() => {
         inject(m, tool, +U.$('#st-sev').value);
         if (tool !== 'clear') log(m.id, '注入故障：' + TH.FAULTS[tool].name, 'info', null, `严重度 ${(+U.$('#st-sev').value).toFixed(2)}（模拟真实故障发生，诊断系统未获知真值）`);
       }
-      S.sel = m; render();
+      S.sel = m; rtab('detail'); render();
     });
+    U.$('#st-alarms').addEventListener('click', e => {
+      const it = e.target.closest('[data-mod]'); if (!it) return;
+      S.sel = S.modules.find(x => x.id === it.dataset.mod); rtab('detail'); render();
+    });
+    U.$$('#st-rtab button').forEach(b => b.onclick = () => rtab(b.dataset.t));
+    U.$$('#st-btab button').forEach(b => b.onclick = () => btab(b.dataset.t));
     U.$$('#st-view button').forEach(b => b.onclick = () => { U.$$('#st-view button').forEach(x => x.classList.toggle('on', x === b)); S.view = b.dataset.v; render(); });
     U.$$('#st-speed button').forEach(b => b.onclick = () => { U.$$('#st-speed button').forEach(x => x.classList.toggle('on', x === b)); S.speed = +b.dataset.s; });
     U.$$('#st-win button').forEach(b => b.onclick = () => { U.$$('#st-win button').forEach(x => x.classList.toggle('on', x === b)); S.trendWin = +b.dataset.w; trend(); });
