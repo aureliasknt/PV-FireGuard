@@ -402,64 +402,62 @@ const Station = (() => {
     const mw = (w - m.l - m.r - gap * (COLS - 1)) / COLS, mh = Math.min(96, (h - m.t - m.b - gap * (ROWS - 1)) / ROWS);
     const top = m.t + ((h - m.t - m.b) - (mh * ROWS + gap * (ROWS - 1))) / 2;
     S.layout = { m, gap, mw, mh, top };
-    const grd = ctx.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, '#1a2338'); grd.addColorStop(1, '#121a2c');
-    ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(148,163,184,.08)';
-    for (let x = 0; x < w; x += 18) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-    ctx.font = '11px "Microsoft YaHei",sans-serif'; ctx.textBaseline = 'middle';
+    const TC = U.theme();
+    ctx.fillStyle = TC.canvas; ctx.fillRect(0, 0, w, h);
+    ctx.font = '12px "Microsoft YaHei",sans-serif'; ctx.textBaseline = 'middle';
     const blink = (Date.now() / 500 | 0) % 2 === 0;
-    for (let c = 0; c < COLS; c++) { ctx.fillStyle = '#64748b'; ctx.textAlign = 'center'; ctx.fillText('M' + (c + 1), m.l + c * (mw + gap) + mw / 2, top - 10); }
+    for (let c = 0; c < COLS; c++) { ctx.fillStyle = TC.text; ctx.textAlign = 'center'; ctx.fillText('M' + (c + 1), m.l + c * (mw + gap) + mw / 2, top - 10); }
     S.modules.forEach(md => {
       const x = m.l + md.c * (mw + gap), y = top + md.r * (mh + gap);
       const irOk = DATA.online(DATA.irFor(md.r));
       let col;
       if (md.burnt) col = [24, 20, 20];
       else if (S.view === 'thermal') col = irOk ? U.PAL.iron((md.Tapp - 15) / (120 - 15)) : [51, 65, 85];
-      else if (md.lvIdx < 0 && md.fire <= 0) col = [30, 52, 48];
-      else { const L = md.fire > 0 ? U.LEVELS[3] : U.LEVELS[Math.max(0, md.lvIdx)]; const c0 = L.color.match(/\w\w/g).map(h2 => parseInt(h2, 16)); const a = 0.45 + 0.55 * md.risk / 100; col = [c0[0] * a + 20 * (1 - a), c0[1] * a + 30 * (1 - a), c0[2] * a + 50 * (1 - a)]; }
+      else if (md.lvIdx < 0 && md.fire <= 0) col = TC.cell;
+      else { const L = md.fire > 0 ? U.LEVELS[3] : U.LEVELS[Math.max(0, md.lvIdx)]; const c0 = L.color.match(/\w\w/g).map(h2 => parseInt(h2, 16)); const a = 0.45 + 0.55 * md.risk / 100; col = [c0[0] * a + TC.cell[0] * (1 - a), c0[1] * a + TC.cell[1] * (1 - a), c0[2] * a + TC.cell[2] * (1 - a)]; }
       ctx.fillStyle = U.rgb(col); ctx.fillRect(x, y, mw, mh);
-      ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = TC.cellLine; ctx.lineWidth = 1;
       for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x + mw * k / 6, y); ctx.lineTo(x + mw * k / 6, y + mh); ctx.stroke(); }
       for (let k = 1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x, y + mh * k / 3); ctx.lineTo(x + mw, y + mh * k / 3); ctx.stroke(); }
-      if (md.burnt) { ctx.strokeStyle = '#3f3f46'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + mw, y + mh); ctx.moveTo(x + mw, y); ctx.lineTo(x, y + mh); ctx.stroke(); }
+      if (md.burnt) { ctx.strokeStyle = TC.burnt; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + mw, y + mh); ctx.moveTo(x + mw, y); ctx.lineTo(x, y + mh); ctx.stroke(); }
       if (md.fire > 0) flame(ctx, x + mw / 2, y + mh / 2, Math.min(mw, mh));
       if (!md.burnt && md.lvIdx >= 1 && md.fire <= 0) {
         const L = U.LEVELS[md.lvIdx];
         if (!(md.lvIdx === 3 && !blink)) { ctx.strokeStyle = L.color; ctx.lineWidth = 2.5; ctx.strokeRect(x - 1, y - 1, mw + 2, mh + 2); }
       }
       if (md.diag && md.diag.cls === 'reflect') { ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right'; ctx.fillText('伪', x + mw - 3, y + 9); }
-      if (md.fault && md.fault.type === 'arc' && !md.burnt) { ctx.fillStyle = S.strings[md.r].shutdown ? '#94a3b8' : '#fde047'; ctx.textAlign = 'left'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('ϟ', x + 3, y + 10); ctx.font = '11px "Microsoft YaHei",sans-serif'; }
-      if (S.sel === md) { ctx.setLineDash([4, 3]); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 4, y - 4, mw + 8, mh + 8); ctx.setLineDash([]); }
+      if (md.fault && md.fault.type === 'arc' && !md.burnt) { ctx.fillStyle = S.strings[md.r].shutdown ? '#94a3b8' : '#fde047'; ctx.textAlign = 'left'; ctx.font = 'bold 12px "Microsoft YaHei",sans-serif'; ctx.fillText('ϟ', x + 3, y + 10); ctx.font = '12px "Microsoft YaHei",sans-serif'; }
+      if (S.sel === md) { ctx.setLineDash([4, 3]); ctx.strokeStyle = TC.strong; ctx.lineWidth = 1.5; ctx.strokeRect(x - 4, y - 4, mw + 8, mh + 8); ctx.setLineDash([]); }
     });
     S.strings.forEach(st => {
       const y = top + st.idx * (mh + gap) + mh / 2;
-      ctx.textAlign = 'center'; ctx.fillStyle = st.arc && !st.shutdown ? (blink ? '#ef4444' : '#fca5a5') : '#94a3b8';
-      ctx.font = 'bold 12px sans-serif'; ctx.fillText(st.id, 20, y - 6);
-      ctx.font = '10px "Microsoft YaHei",sans-serif';
-      if (st.shutdown) { ctx.fillStyle = '#a5b4fc'; ctx.fillText('RSD', 20, y + 8); }
+      ctx.textAlign = 'center'; ctx.fillStyle = st.arc && !st.shutdown ? (blink ? '#ef4444' : '#fca5a5') : TC.text;
+      ctx.font = 'bold 12px "Microsoft YaHei",sans-serif'; ctx.fillText(st.id, 20, y - 6);
+      ctx.font = '12px "Microsoft YaHei",sans-serif';
+      if (st.shutdown) { ctx.fillStyle = TC.strong; ctx.fillText('RSD', 20, y + 8); }
       else if (st.arc) { ctx.fillStyle = '#ef4444'; ctx.fillText('电弧', 20, y + 8); }
       else if (st.noData) { ctx.fillStyle = '#fbbf24'; ctx.fillText('CT离线', 20, y + 8); }
-      if (st.shutdown) { ctx.fillStyle = 'rgba(15,23,42,.35)'; ctx.fillRect(m.l - 2, y - mh / 2 - 2, w - m.l - m.r + 4, mh + 4); }
+      if (st.shutdown) { ctx.fillStyle = TC.shade; ctx.fillRect(m.l - 2, y - mh / 2 - 2, w - m.l - m.r + 4, mh + 4); }
     });
     if (S.view === 'thermal') ['IR-01', 'IR-02'].forEach((id, k) => {
       if (DATA.online(id)) return;
       const y = top + k * 3 * (mh + gap) + (3 * mh + 2 * gap) / 2;
-      ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 13px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 12px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(`${id} 红外通道离线 · 热异常诊断暂停`, m.l + (w - m.l - m.r) / 2, y);
-      ctx.font = '11px "Microsoft YaHei",sans-serif';
+      ctx.font = '12px "Microsoft YaHei",sans-serif';
     });
     const ax = w - 110, ay = h - 14, rad = S.env.dir * Math.PI / 180, L = 9 + S.env.v * 1.2;
-    ctx.strokeStyle = '#7dd3fc'; ctx.fillStyle = '#7dd3fc'; ctx.lineWidth = 2;
+    ctx.strokeStyle = TC.text; ctx.fillStyle = TC.text; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(ax - Math.cos(rad) * L, ay - Math.sin(rad) * L); ctx.lineTo(ax + Math.cos(rad) * L, ay + Math.sin(rad) * L); ctx.stroke();
     ctx.beginPath(); ctx.arc(ax + Math.cos(rad) * L, ay + Math.sin(rad) * L, 3, 0, 7); ctx.fill(); ctx.lineWidth = 1;
-    ctx.font = '11px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`风 ${S.env.v} m/s`, ax + 22, ay);
+    ctx.font = '12px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`风 ${S.env.v} m/s`, ax + 22, ay);
     const lx = m.l, ly = h - 18, lw = Math.min(260, w * 0.35);
     if (S.view === 'thermal') {
       for (let i = 0; i < lw; i++) { ctx.fillStyle = U.rgb(U.PAL.iron(i / lw)); ctx.fillRect(lx + i, ly, 1, 8); }
-      ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left';
+      ctx.fillStyle = TC.text; ctx.textAlign = 'left';
       ctx.fillText('红外表观温度  15℃ → ≥120℃', lx + lw + 8, ly + 4);
     } else {
-      [['正常', 'rgb(30,52,48)'], ...U.LEVELS.map(L => [L.grade + '预警', L.color])].forEach(([n, c], i) => { ctx.fillStyle = c; ctx.fillRect(lx + i * 78, ly, 12, 8); ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left'; ctx.fillText(n, lx + i * 78 + 16, ly + 4); });
+      [['正常', U.rgb(TC.cell)], ...U.LEVELS.map(L => [L.grade + '预警', L.color])].forEach(([n, c], i) => { ctx.fillStyle = c; ctx.fillRect(lx + i * 78, ly, 12, 8); ctx.fillStyle = TC.text; ctx.textAlign = 'left'; ctx.fillText(n, lx + i * 78 + 16, ly + 4); });
     }
   }
 
@@ -482,7 +480,7 @@ const Station = (() => {
     const al = S.modules.filter(m => m.lvIdx >= 1 && !m.burnt).length;
     const fires = S.modules.filter(m => m.fire > 0).length;
     const open = S.events.filter(isOpen).length;
-    U.$('#k-alarms').innerHTML = `${al}${fires ? `<small style="color:#ef4444">🔥${fires}</small>` : ''}`;
+    U.$('#k-alarms').innerHTML = `${al}${fires ? `<small style="color:#ef4444">起火 ${fires}</small>` : ''}`;
     U.$('#k-alarms-s').textContent = `未关闭事件 ${open} 起 · 已抑制伪热斑 ${S.stats.suppressed} 次`;
     const L = S.lvMax >= 0 ? U.LEVELS[S.lvMax] : null;
     U.$('#k-risk').innerHTML = L ? `<span style="color:${L.color}">${L.grade}</span><small>${FUSE.PRIO[S.lvMax].p}</small>` : '<span style="color:#22c55e">正常</span>';
@@ -519,7 +517,7 @@ const Station = (() => {
       const status = st.noData ? U.tag('采样不满足', 'orange') : st.shutdown ? U.tag('已关断', 'action') : st.arc ? U.tag('电弧确认', 'red') : pa >= FUSE.CFG.pSus ? U.tag('疑似电弧', 'orange') : st.I === 0 ? U.tag('停运', 'info') : U.tag('正常', 'ok');
       const cls = st.noData ? `<span style="color:#fbbf24">CT-S${st.idx + 1} 离线，暂停判别</span>` : st.probs ? `<span style="color:${DSP.CLASS_COLORS[st.cls]}">${DSP.CLASS_NAMES[st.cls]}</span>` : (Arc.ready ? '—' : '<span class="muted">模型训练中</span>');
       const btn = st.shutdown ? `<button class="btn sm" data-restore="${st.idx}">恢复送电</button>` : '';
-      return `<div class="srow"><b>${st.id}</b><span>${st.I.toFixed(2)} A</span><div><div class="mini-bar"><i style="width:${(pa * 100).toFixed(0)}%;background:${pa > 0.6 ? '#ef4444' : pa > 0.3 ? '#f97316' : '#22c55e'}"></i></div><div class="muted" style="font-size:11px;margin-top:2px">${DATA.loopPath(st.idx)} · P(电弧) ${(pa * 100).toFixed(1)}% · ${cls}</div></div><span>${status}</span><span>${btn}</span></div>`;
+      return `<div class="srow"><b>${st.id}</b><span>${st.I.toFixed(2)} A</span><div><div class="mini-bar"><i style="width:${(pa * 100).toFixed(0)}%;background:${pa > 0.6 ? '#ef4444' : pa > 0.3 ? '#f97316' : '#22c55e'}"></i></div><div class="muted" style="font-size:12px;margin-top:2px">${DATA.loopPath(st.idx)} · P(电弧) ${(pa * 100).toFixed(1)}% · ${cls}</div></div><span>${status}</span><span>${btn}</span></div>`;
     }).join('');
   }
 
@@ -594,7 +592,7 @@ const Station = (() => {
     if (!F.length) return;
     const x = F.map(f => (f.t - S.t) / 60), o = { xMin: -S.trendWin, xMax: 0, yTicks: 2, xFmt: v => v.toFixed(0) + ' min' };
     U.lineChart(U.$('#st-trend-T'), { ...o, series: [{ x, y: F.map(f => f.Tmax), color: '#f97316', label: '组件最高温度 ℃', fill: 'rgba(249,115,22,.08)' }] });
-    U.lineChart(U.$('#st-trend-P'), { ...o, yMin: 0, series: [{ x, y: F.map(f => f.P), color: '#22d3ee', label: '发电功率 kW', fill: 'rgba(34,211,238,.08)' }] });
+    U.lineChart(U.$('#st-trend-P'), { ...o, yMin: 0, series: [{ x, y: F.map(f => f.P), color: '#00bcd4', label: '发电功率 kW', fill: 'rgba(0,188,212,.08)' }] });
     U.lineChart(U.$('#st-trend-R'), { ...o, yMin: 0, series: [{ x, y: F.map(f => f.nAb), color: '#ef4444', label: '黄色及以上异常组件数' }, { x, y: F.map(f => f.risk / 10), color: '#a78bfa', label: '参考风险指数 /10', dash: [4, 3] }] });
   }
 
@@ -648,7 +646,7 @@ const Station = (() => {
     U.$$('#st-view button').forEach(b => b.onclick = () => { U.$$('#st-view button').forEach(x => x.classList.toggle('on', x === b)); S.view = b.dataset.v; render(); });
     U.$$('#st-speed button').forEach(b => b.onclick = () => { U.$$('#st-speed button').forEach(x => x.classList.toggle('on', x === b)); S.speed = +b.dataset.s; });
     U.$$('#st-win button').forEach(b => b.onclick = () => { U.$$('#st-win button').forEach(x => x.classList.toggle('on', x === b)); S.trendWin = +b.dataset.w; trend(); });
-    U.$('#st-play').onclick = () => { S.running = !S.running; U.$('#st-play').textContent = S.running ? '⏸ 暂停' : '▶ 继续'; U.$('#hd-pulse').style.background = S.running ? '' : '#64748b'; };
+    U.$('#st-play').onclick = () => { S.running = !S.running; U.$('#st-play').textContent = S.running ? '暂停' : '继续'; U.$('#hd-pulse').style.background = S.running ? '' : '#64748b'; };
     U.$('#st-load').onclick = () => { const k = U.$('#st-scenario').value; if (!k) { U.toast('请先选择一个场景', 'warn'); return; } loadScenario(k); };
     U.$('#st-auto').onchange = e => { S.auto = e.target.checked; log('电站', S.auto ? '启用自动联动处置' : '关闭自动联动处置', 'info', null, S.auto ? '红色预警/电弧确认时自动快速关断组串' : '仅告警，不自动关断'); DATA.audit('联动处置开关', S.auto ? '启用' : '关闭'); };
     U.$('#st-reset').onclick = () => reset();

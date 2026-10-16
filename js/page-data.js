@@ -40,7 +40,7 @@ const DataPage = (() => {
   function renderPerms() {
     const P = Object.keys(DATA.PERM_NAMES);
     U.$('#ds-perm').innerHTML = `<thead><tr><th>权限</th>${Object.values(DATA.ROLES).map(r => `<th>${r.name}</th>`).join('')}</tr></thead><tbody>` +
-      P.map(p => `<tr><td>${DATA.PERM_NAMES[p]}</td>${Object.entries(DATA.ROLES).map(([k, r]) => `<td style="${k === DATA.role ? 'background:rgba(34,211,238,.08)' : ''}">${r.perms.includes(p) ? '✓' : '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('') + '</tbody>';
+      P.map(p => `<tr><td>${DATA.PERM_NAMES[p]}</td>${Object.entries(DATA.ROLES).map(([k, r]) => `<td style="${k === DATA.role ? 'background:var(--accent-weak)' : ''}">${r.perms.includes(p) ? '✓' : '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('') + '</tbody>';
   }
 
   function renderCfg() {
@@ -52,13 +52,13 @@ const DataPage = (() => {
   function renderFeatures() {
     const n = DSP.FEATURE_NAMES;
     const rows = [
-      ['电弧·时域', n.slice(0, 5).join('、'), 'CT-S1…S6 · 200 kHz', '模块③'],
-      ['电弧·频域/谱统计', n.slice(5, 13).join('、'), 'CT-S1…S6 · FFT/STFT', '模块③'],
-      ['电弧·小波', n.slice(13).join('、'), 'CT-S1…S6 · Haar 4 层', '模块③'],
-      ['热·区域特征', 'ΔTmax、ΔTmean、面积、长宽比、填充率、边缘锐度、部位', 'IR-01/02 · 卷积特征图', '模块②'],
-      ['热·时序特征', '温升速率 dT/dt、相对组串中位温差', 'IR + TC · 1 Hz 时序', '模块②④'],
-      ['电气·运行量', '组串电压、电流、功率', 'VT/CT · 1 Hz 汇总', '模块①④'],
-      ['环境', '辐照、气温、风速风向、湿度', 'WS-01', '模块①④']
+      ['电弧·时域', n.slice(0, 5).join('、'), 'CT-S1…S6 · 200 kHz', '电弧'],
+      ['电弧·频域/谱统计', n.slice(5, 13).join('、'), 'CT-S1…S6 · FFT/STFT', '电弧'],
+      ['电弧·小波', n.slice(13).join('、'), 'CT-S1…S6 · Haar 4 层', '电弧'],
+      ['热·区域特征', 'ΔTmax、ΔTmean、面积、长宽比、填充率、边缘锐度、部位', 'IR-01/02 · 卷积特征图', '热异常'],
+      ['热·时序特征', '温升速率 dT/dt、相对组串中位温差', 'IR + TC · 1 Hz 时序', '热异常 · 融合'],
+      ['电气·运行量', '组串电压、电流、功率', 'VT/CT · 1 Hz 汇总', '监测 · 融合'],
+      ['环境', '辐照、气温、风速风向、湿度', 'WS-01', '监测 · 融合']
     ];
     U.$('#ds-feat').innerHTML = rows.map(r => `<tr><td><b>${r[0]}</b></td><td style="font-size:12px">${r[1]}</td><td class="muted" style="font-size:12px">${r[2]}</td><td>${r[3]}</td></tr>`).join('');
   }

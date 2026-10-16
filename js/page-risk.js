@@ -29,7 +29,7 @@ const Risk = (() => {
     ['rk-scene', 'rk-mat', 'rk-afci', 'rk-rsd', 'rk-mon', 'rk-spr'].forEach(id => U.$('#' + id).addEventListener('change', schedule));
     U.$('#rk-from').onclick = () => {
       const m = Station.selected();
-      if (!m) { U.toast('请先在模块①“电站可视化与状态监测”中点击选中一个组件', 'warn'); return; }
+      if (!m) { U.toast('请先在“电站状态监测”中选中组件', 'warn'); return; }
       loadModule(m, Station.env(), Station.isAuto());
     };
   }

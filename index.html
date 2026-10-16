@@ -5,37 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>光伏卫士 PV-FireGuard</title>
 <link rel="stylesheet" href="css/style.css">
+<script>try{var t=localStorage.getItem('pvfg-theme')||'dark';if(t==='system')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme='dark';}</script>
 </head>
 <body>
 <header class="top">
   <div class="logo">PV</div>
-  <div class="brand"><b>光伏卫士 PV-FireGuard</b><small>光伏电站电—热融合故障诊断与火灾预警软件模型机 · v1.1</small></div>
+  <div class="brand"><b>光伏卫士 PV-FireGuard</b><small>v1.1</small></div>
   <div class="spacer"></div>
-  <div class="stat hide-sm"><span class="pulse" id="hd-pulse"></span>系统运行中<br><span class="muted">中国科学技术大学 火灾安全全国重点实验室</span></div>
-  <div class="stat hide-sm"><span class="muted">当前用户</span><br><b id="hd-user">—</b></div>
-  <div class="stat"><span class="muted">仿真时钟</span><br><b id="hd-clock">11:00:00</b></div>
-  <div class="stat"><span class="muted">电站预警</span><br><b id="hd-risk">—</b></div>
+  <div class="stat hide-sm"><span class="muted">状态</span><br><b><span class="pulse" id="hd-pulse"></span>运行中</b></div>
+  <div class="stat hide-sm"><span class="muted">用户</span><br><b id="hd-user">—</b></div>
+  <div class="stat"><span class="muted">时钟</span><br><b id="hd-clock">11:00:00</b></div>
+  <div class="stat"><span class="muted">预警</span><br><b id="hd-risk">—</b></div>
 </header>
 
 <div class="layout">
   <nav class="side" id="nav">
-    <div class="navgroup">五大功能模块</div>
-    <button data-page="station" class="active"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M6.5 11h2.5l1.5-3 3 6 1.5-3h2.5"/><path d="M9 21h6M12 17v4"/></svg></span>电站可视化与状态监测</button>
-    <button data-page="hotspot"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/><circle cx="12" cy="17.5" r="1.2" fill="currentColor"/></svg></span>热异常与热斑诊断</button>
-    <button data-page="arc"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></span>直流电弧故障诊断</button>
-    <button data-page="risk"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.5 5.8v5.7c0 4.6 3.1 8.4 7.5 9.7 4.4-1.3 7.5-5.1 7.5-9.7V5.8z"/><path d="M12 8v5"/><circle cx="12" cy="16.3" r="1" fill="currentColor"/></svg></span>电—热融合风险评估与预警</button>
-    <button data-page="report"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span>事件管理与诊断报告</button>
-    <div class="navgroup">支撑</div>
-    <button data-page="data"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/></svg></span>后台数据支撑层</button>
-    <button data-page="about"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="1" fill="currentColor"/></svg></span>项目与技术</button>
-    <div class="navnote">以<b>电—热融合</b>为核心，实现光伏直流侧故障诊断、火灾预警与全过程事件追溯。<br><br>所有算法均在浏览器本地运行，无需联网与安装。</div>
+    <div class="navgroup">模块</div>
+    <button data-page="station" class="active"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M6.5 11h2.5l1.5-3 3 6 1.5-3h2.5"/><path d="M9 21h6M12 17v4"/></svg></span>电站状态监测</button>
+    <button data-page="hotspot"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/><circle cx="12" cy="17.5" r="1.2" fill="currentColor"/></svg></span>热异常诊断</button>
+    <button data-page="arc"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></span>直流电弧诊断</button>
+    <button data-page="risk"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.5 5.8v5.7c0 4.6 3.1 8.4 7.5 9.7 4.4-1.3 7.5-5.1 7.5-9.7V5.8z"/><path d="M12 8v5"/><circle cx="12" cy="16.3" r="1" fill="currentColor"/></svg></span>电—热融合评估</button>
+    <button data-page="report"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span>事件与报告</button>
+    <div class="navgroup">系统</div>
+    <button data-page="data"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/></svg></span>数据与系统</button>
+    <button data-page="settings"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/></svg></span>设置</button>
+    <button data-page="about"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="1" fill="currentColor"/></svg></span>项目说明</button>
   </nav>
 
   <main>
   <!-- ================= ① 电站可视化与状态监测 ================= -->
   <section class="page active" id="page-station">
-    <div class="page-title st-title"><h2>① 电站可视化与状态监测</h2><p>建立设备与测点关联，展示电压、电流、温度和在线状态</p>
-      <div class="outline">输出：<b>电站总览</b> · <b>异常分布</b> · <b>历史趋势</b></div></div>
+    <div class="page-title st-title"><h2>电站状态监测</h2><p>28.8 kWp · 6 组串 × 12 块</p></div>
     <div class="grid kpis compact">
       <div class="card kpi"><div class="l">实时发电功率</div><div class="v" id="k-power">—</div><div class="s" id="k-power-s">—</div></div>
       <div class="card kpi"><div class="l">组件最高温度</div><div class="v" id="k-tmax">—</div><div class="s" id="k-tmax-s">—</div></div>
@@ -49,11 +49,11 @@
     <div class="st-main">
       <div class="card st-array">
         <div class="card-head">
-          <h3>阵列实时态势 <span class="sub">28.8 kWp · 6 组串 × 12 块 · 点击组件查看详情或注入故障</span></h3>
+          <h3>阵列 <span class="sub">点击组件查看</span></h3>
           <div class="row">
             <div class="seg" id="st-view"><button data-v="thermal" class="on">红外热像</button><button data-v="risk">异常分布</button></div>
             <div class="seg" id="st-speed"><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="5">5×</button><button data-s="10">10×</button></div>
-            <button class="btn sm" id="st-play">⏸ 暂停</button>
+            <button class="btn sm" id="st-play">暂停</button>
           </div>
         </div>
         <div class="canvas-box"><canvas id="st-canvas"></canvas></div>
@@ -86,13 +86,13 @@
       </div>
       <div class="st-side">
         <div class="card st-trend">
-          <div class="card-head"><h3>历史趋势 <span class="sub">1 Hz</span></h3><div class="seg" id="st-win"><button data-w="5" class="on">5 min</button><button data-w="15">15 min</button><button data-w="30">30 min</button></div></div>
+          <div class="card-head"><h3>趋势</h3><div class="seg" id="st-win"><button data-w="5" class="on">5 min</button><button data-w="15">15 min</button><button data-w="30">30 min</button></div></div>
           <canvas id="st-trend-T"></canvas>
           <canvas id="st-trend-P"></canvas>
           <canvas id="st-trend-R"></canvas>
         </div>
         <div class="card st-alarm">
-          <div class="card-head"><div class="seg" id="st-rtab"><button data-t="alarms" class="on">告警与证据</button><button data-t="detail">组件详情</button></div><span class="muted" style="font-size:11.5px">处理见模块⑤</span></div>
+          <div class="card-head"><div class="seg" id="st-rtab"><button data-t="alarms" class="on">告警与证据</button><button data-t="detail">组件详情</button></div></div>
           <div class="st-rpanel" id="st-rp-alarms"><div class="alist" id="st-alarms"></div></div>
           <div class="st-rpanel" id="st-rp-detail" style="display:none"><div id="st-detail"></div></div>
         </div>
@@ -105,7 +105,7 @@
         <button data-t="dev" class="on">设备与测点状态</button><button data-t="env">环境工况</button><button data-t="dist">异常分布统计</button><button data-t="log">完整告警日志</button></div>
         <div class="row" id="st-log-tools" style="display:none"><button class="btn sm" id="st-csv">导出 CSV</button><button class="btn sm" id="st-clearlog">清空</button></div></div>
       <div class="st-bpanel" id="st-bp-dev">
-        <div class="hint" style="margin-bottom:6px">组串 ↔ 汇流箱 / MPPT ↔ 测点（电流 CT · 电压 VT · 热电偶 TC · 红外 IR） · <span class="dot on"></span>在线 <span class="dot warn"></span>质量异常 <span class="dot off"></span>离线，可在“后台数据支撑层”模拟通信中断或时钟漂移。</div>
+        <div class="hint" style="margin-bottom:6px"><span class="dot on"></span>在线 <span class="dot warn"></span>质量异常 <span class="dot off"></span>离线</div>
         <div class="tablewrap" style="max-height:none"><table class="t"><thead><tr><th>组串</th><th>回路</th><th>电压</th><th>电流</th><th>功率</th><th>最高温度</th><th>测点在线 CT/VT/TC/IR</th><th>状态</th></tr></thead><tbody id="st-dev"></tbody></table></div>
       </div>
       <div class="st-bpanel env-grid" id="st-bp-env" style="display:none">
@@ -126,8 +126,7 @@
   </section>
   <!-- ================= ② 热异常与热斑诊断 ================= -->
   <section class="page" id="page-hotspot">
-    <div class="page-title"><h2>② 热异常与热斑诊断</h2><p>分析组件、连接器等部位的热点、温差及温升过程 · 红外热像 → 灰度化 → 卷积特征 → 候选区域 + NMS → 分类与分级</p></div>
-    <div class="outline">输出：<b>热异常位置</b> · <b>特征参数</b> · <b>待复核结果</b></div>
+    <div class="page-title"><h2>热异常诊断</h2><p>组件 · 连接器 · 接线盒</p></div>
     <div class="grid side-main">
       <div class="card">
         <h3>输入与参数</h3>
@@ -161,16 +160,16 @@
         <div class="grid g2" style="margin-bottom:14px">
           <div class="card"><h3>热异常位置</h3><canvas class="img" id="hs-big" style="margin-bottom:10px"></canvas><div id="hs-verdict"></div></div>
           <div class="card">
-            <h3>温升过程 <span class="sub">故障点相对温差 ΔT 随时间变化</span></h3><canvas id="hs-rise" style="height:160px"></canvas><div class="hint" id="hs-rise-src"></div>
+            <h3>温升过程 <span class="sub">ΔT</span></h3><canvas id="hs-rise" style="height:160px"></canvas><div class="hint" id="hs-rise-src"></div>
             <h3 style="margin-top:12px">特征参数 <span class="sub">最严重区域</span></h3><div class="kv" id="hs-feat"></div>
           </div>
         </div>
         <div class="card" style="margin-bottom:14px">
-          <h3>诊断结果与复核 <span class="sub">全部结果默认“待复核”，人工确认后进入事件档案（模块⑤）</span></h3>
+          <h3>诊断结果与复核 <span class="sub">确认后建档</span></h3>
           <div class="tablewrap" style="max-height:none"><table class="t"><thead><tr><th>#</th><th>类别</th><th>部位 / 位置</th><th>置信度</th><th>ΔTmax / ΔTmean</th><th>面积</th><th>分级</th><th>复核状态</th></tr></thead><tbody id="hs-table"></tbody></table></div>
         </div>
         <div class="grid g2" style="margin-bottom:0">
-          <div class="card"><h3>热点温度剖面 <span class="sub">穿过最高温点的水平线</span></h3><canvas id="hs-profile" style="height:150px"></canvas></div>
+          <div class="card"><h3>热点温度剖面 </h3><canvas id="hs-profile" style="height:150px"></canvas></div>
           <div class="card"><h3>首要区域类别概率</h3><div class="probs" id="hs-probs"></div></div>
         </div>
       </div>
@@ -179,11 +178,10 @@
 
   <!-- ================= ③ 直流电弧故障诊断 ================= -->
   <section class="page" id="page-arc">
-    <div class="page-title"><h2>③ 直流电弧故障诊断</h2><p>分析满足采样要求的电气信号，识别疑似电弧事件 · 采样核验 → 时域/频域/小波 17 维特征 → 神经网络判别 → 连续窗确认</p></div>
-    <div class="outline">输出：<b>异常时段</b> · <b>关联回路</b> · <b>诊断证据</b></div>
+    <div class="page-title"><h2>直流电弧诊断</h2><p>200 kHz · 17 维特征 · 连续窗确认</p></div>
     <div class="grid g2">
       <div class="card"><h3>组串回路实时监测 <span class="sub">组串 → 汇流箱 → MPPT</span></h3><div class="strings" id="arc-strings"></div></div>
-      <div class="card"><h3>疑似电弧事件 <span class="sub">在线监测自动记录</span></h3>
+      <div class="card"><h3>疑似电弧事件 </h3>
         <div class="tablewrap" style="max-height:330px"><table class="t"><thead><tr><th>关联回路</th><th>异常时段</th><th>峰值P</th><th>结论</th><th>定位</th><th>诊断证据</th><th>事件</th></tr></thead><tbody id="arc-segs"></tbody></table></div></div>
     </div>
     <div class="grid side-main">
@@ -214,7 +212,7 @@
     <div class="grid g3">
       <div class="card"><h3>多域特征向量</h3><div class="tablewrap" style="max-height:260px"><table class="t"><thead><tr><th>特征</th><th>域</th><th style="text-align:right">数值</th></tr></thead><tbody id="arc-feat"></tbody></table></div></div>
       <div class="card">
-        <div class="card-head"><h3>模型训练 <span class="sub">浏览器端实时训练</span></h3><button class="btn primary sm" id="arc-train">重新训练</button></div>
+        <div class="card-head"><h3>模型训练 </h3><button class="btn primary sm" id="arc-train">重新训练</button></div>
         <div class="row" style="margin-bottom:6px">
           <label class="muted" style="font-size:12px">每类样本</label><select id="arc-n"><option>60</option><option selected>100</option><option>160</option></select>
           <label class="muted" style="font-size:12px">隐层</label><select id="arc-h"><option>8</option><option selected>16</option><option>32</option></select>
@@ -226,9 +224,9 @@
       <div class="card"><h3>混淆矩阵 <span class="sub">测试集 30%</span></h3><canvas id="arc-cm" style="height:220px"></canvas></div>
     </div>
     <div class="grid g2">
-      <div class="card"><h3>特征重要性 <span class="sub">置换法（可解释 AI）</span></h3><canvas id="arc-imp" style="height:300px"></canvas></div>
+      <div class="card"><h3>特征重要性 <span class="sub">置换法</span></h3><canvas id="arc-imp" style="height:300px"></canvas></div>
       <div class="card">
-        <div class="card-head"><h3>实时检测演示 <span class="sub">0.5 s 连续流 · 参照 UL 1699B</span></h3><button class="btn primary sm" id="arc-stream">运行演示</button></div>
+        <div class="card-head"><h3>实时检测演示 <span class="sub">UL 1699B</span></h3><button class="btn primary sm" id="arc-stream">运行演示</button></div>
         <canvas id="arc-timeline" style="height:150px"></canvas>
         <div class="kv" id="arc-stream-res" style="margin-top:10px"></div>
       </div>
@@ -237,8 +235,7 @@
 
   <!-- ================= ④ 电—热融合风险评估与预警 ================= -->
   <section class="page" id="page-risk">
-    <div class="page-title"><h2>④ 电—热融合风险评估与预警</h2><p>关联电气异常与热状态演化，依据验证判据分级 · 热失控物理推演 + 多因素风险量化作为参考</p></div>
-    <div class="outline">输出：<b>风险等级</b> · <b>触发原因</b> · <b>处置优先级</b></div>
+    <div class="page-title"><h2>电—热融合评估</h2><p>判据分级 · 触发原因 · 处置优先级</p></div>
     <div class="grid side-main">
       <div class="card">
         <div class="row sp" style="margin-bottom:8px"><h3 style="margin:0">评估输入</h3><button class="btn sm" id="rk-from">载入选中组件</button></div>
@@ -276,25 +273,24 @@
           <div class="card"><h3>风险画像</h3><canvas id="rk-radar" style="height:200px"></canvas></div>
         </div>
         <div class="grid g2">
-          <div class="card"><h3>验证判据核验 <span class="sub">判据阈值可在“后台数据支撑层”管理</span></h3>
+          <div class="card"><h3>验证判据核验 </h3>
             <table class="t"><thead><tr><th>判据</th><th>当前值</th><th>阈值</th><th>结果</th></tr></thead><tbody id="rk-crit"></tbody></table>
             <div class="hint" id="rk-obs-info" style="margin-top:6px"></div></div>
-          <div class="card"><h3>触发原因 <span class="sub">满足的分级规则</span></h3><ul class="why" id="rk-why"></ul></div>
+          <div class="card"><h3>触发原因 </h3><ul class="why" id="rk-why"></ul></div>
         </div>
         <div class="grid g2">
-          <div class="card"><h3>热状态演化推演 <span class="sub">集总热容 + 对流辐射 + 劣化正反馈</span></h3><canvas id="rk-curve" style="height:240px"></canvas>
+          <div class="card"><h3>热状态演化推演 </h3><canvas id="rk-curve" style="height:240px"></canvas>
             <table class="t thr-table" style="margin-top:8px"><thead><tr><th>温度阈值</th><th>无防护</th><th>有联动处置</th></tr></thead><tbody id="rk-thr"></tbody></table></div>
-          <div class="card"><h3>风险因子贡献 <span class="sub">参考指数的对数几率贡献</span></h3><canvas id="rk-contrib" style="height:300px"></canvas></div>
+          <div class="card"><h3>风险因子贡献 </h3><canvas id="rk-contrib" style="height:300px"></canvas></div>
         </div>
-        <div class="card"><h3>处置建议 <span class="sub">按处置优先级排序</span></h3><ol class="recos" id="rk-recos"></ol></div>
+        <div class="card"><h3>处置建议 </h3><ol class="recos" id="rk-recos"></ol></div>
       </div>
     </div>
   </section>
 
   <!-- ================= ⑤ 事件管理与诊断报告 ================= -->
   <section class="page" id="page-report">
-    <div class="page-title noprint"><h2>⑤ 事件管理与诊断报告</h2><p>同步回放电—热证据，记录确认、排查、处理和复核</p></div>
-    <div class="outline noprint">输出：<b>事件档案</b> · <b>处理状态</b> · <b>可导出报告</b></div>
+    <div class="page-title noprint"><h2>事件与报告</h2><p>确认 → 排查 → 处理 → 复核</p></div>
     <div class="row noprint" style="margin-bottom:12px"><div class="seg" id="ev-tab"><button data-t="events" class="on">事件档案</button><button data-t="report">诊断报告</button></div></div>
     <div id="ev-panel-events" class="noprint">
       <div class="grid kpis5" id="ev-kpi"></div>
@@ -316,16 +312,16 @@
 
   <!-- ================= 后台数据支撑层 ================= -->
   <section class="page" id="page-data">
-    <div class="page-title"><h2>后台数据支撑层</h2><p>为五大功能模块提供数据接入、质量保障、存储归档、模型判据与运维管理</p></div>
+    <div class="page-title"><h2>数据与系统</h2><p>测点 · 质量 · 存储 · 判据 · 权限</p></div>
     <div class="grid g2">
       <div class="card"><h3>多源数据接入与设备映射</h3>
         <div class="tablewrap" style="max-height:380px"><table class="t"><thead><tr><th>测点</th><th>类型</th><th>映射对象</th><th>接口</th><th>采样</th><th>状态</th><th>运维模拟</th></tr></thead><tbody id="ds-src"></tbody></table></div></div>
-      <div class="card"><h3>时间同步与数据质量检查 <span class="sub">高速通道 PTP ≤1 ms · 低速通道 NTP ≤50 ms · 完整率 ≥99%</span></h3>
+      <div class="card"><h3>时间同步与数据质量检查 <span class="sub">≤1 ms / ≤50 ms · ≥99%</span></h3>
         <div class="tablewrap" style="max-height:380px"><table class="t"><thead><tr><th>测点</th><th>时钟偏差</th><th>完整率</th><th>最近更新</th><th>检查结果</th></tr></thead><tbody id="ds-q"></tbody></table></div></div>
     </div>
     <div class="grid g2">
       <div class="card"><h3>数据预处理与特征管理</h3>
-        <div class="flow mini"><div class="node">去噪与标定</div><div class="arr">➜</div><div class="node">时间对齐</div><div class="arr">➜</div><div class="node">窗口切分</div><div class="arr">➜</div><div class="node">特征提取</div><div class="arr">➜</div><div class="node">特征库</div></div>
+        <div class="flow mini"><div class="node">去噪与标定</div><div class="arr">→</div><div class="node">时间对齐</div><div class="arr">→</div><div class="node">窗口切分</div><div class="arr">→</div><div class="node">特征提取</div><div class="arr">→</div><div class="node">特征库</div></div>
         <table class="t" style="margin-top:10px"><thead><tr><th>特征组</th><th>特征项</th><th>数据来源</th><th>使用模块</th></tr></thead><tbody id="ds-feat"></tbody></table></div>
       <div class="card"><div class="card-head"><h3>历史存储与事件归档</h3><button class="btn sm" id="ds-exp-hist">导出历史时序 CSV</button></div>
         <div class="kv" id="ds-store" style="grid-template-columns:200px 1fr"></div>
@@ -345,10 +341,19 @@
     </div>
   </section>
 
+  <!-- ================= 设置 ================= -->
+  <section class="page" id="page-settings">
+    <div class="page-title"><h2>设置</h2></div>
+    <div class="card" style="max-width:560px">
+      <h3>外观</h3>
+      <div class="set-row"><span class="k">界面主题</span>
+        <div class="seg" id="set-theme"><button data-v="dark">深色</button><button data-v="light">浅色</button><button data-v="system">跟随系统</button></div></div>
+    </div>
+  </section>
+
   <!-- ================= 关于 ================= -->
   <section class="page" id="page-about">
-    <div class="page-title"><h2>项目与技术</h2><p>中国科学技术大学 2025 年度“雏鹰基金”原创课题（产品类）· 软件模型机</p></div>
-    <div class="banner">以电—热融合为核心，实现光伏直流侧故障诊断、火灾预警与全过程事件追溯</div>
+    <div class="page-title"><h2>项目说明</h2><p>2025 雏鹰基金 · 产品类</p></div>
     <div class="card" style="margin-bottom:14px">
       <h3>基于复杂故障场景的光伏电站故障诊断与火灾预警技术研究</h3>
       <div class="kv" style="max-width:720px;grid-template-columns:110px 1fr">
@@ -394,12 +399,12 @@
         </tbody></table></div>
       <div class="card"><h3>使用说明</h3>
         <ol class="recos">
-          <li>模块①加载场景库或点击组件注入故障，观察测点状态、异常分布与历史趋势。</li>
-          <li>模块②查看热异常位置、特征参数与温升过程，对“待复核”结果进行确认或判为误报。</li>
-          <li>模块③查看疑似电弧事件的异常时段、关联回路与诊断证据；可改变采集条件测试采样核验。</li>
-          <li>模块④逐项核验电—热判据，得到风险等级、触发原因与处置优先级。</li>
-          <li>模块⑤对事件进行确认、排查、处理、复核，回放电—热证据并导出报告。</li>
-          <li>“后台数据支撑层”可模拟测点中断/时钟漂移、修改预警判据、切换用户角色并查看操作日志。</li>
+          <li>电站状态监测：加载场景或点击组件注入故障。</li>
+          <li>热异常诊断：确认或驳回待复核结果。</li>
+          <li>直流电弧诊断：查看异常时段、回路与证据；可改采集条件。</li>
+          <li>电—热融合评估：逐项核验判据。</li>
+          <li>事件与报告：处理事件、回放证据、导出报告。</li>
+          <li>数据与系统：测点故障模拟、判据修改、角色切换、操作日志。</li>
         </ol>
         <p class="hint">说明：当前版本采用基于物理规律的仿真数据进行演示，模型参数与判据阈值为示意值；接入实验平台采集数据后可替换训练集、模型参数并完成判据验证。</p></div>
     </div>
@@ -420,6 +425,7 @@
 <script src="js/station.js"></script>
 <script src="js/page-report.js"></script>
 <script src="js/page-data.js"></script>
+<script src="js/page-settings.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

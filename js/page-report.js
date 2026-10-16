@@ -55,7 +55,7 @@ const Events = (() => {
       st.sig = sig;
       U.$('#ev-list').innerHTML = L.map(e => `<tr data-ev="${e.id}" class="${e.id === st.sel ? 'sel' : ''}"><td><b>${e.id}</b></td><td>${hms(e.tStart)}</td><td>${e.loc}</td><td>${e.type}</td>
         <td>${U.tag(U.LEVELS[Math.max(0, e.lvMax)].grade, U.LEVELS[Math.max(0, e.lvMax)].key)}</td><td>${e.prio}</td><td>${U.tag(e.status, ST_TAG[e.status])}</td></tr>`).join('')
-        || '<tr><td colspan="7" class="muted">暂无事件。在模块①加载复杂故障场景，或在模块②复核确认热异常后自动建档。</td></tr>';
+        || '<tr><td colspan="7" class="muted">暂无事件</td></tr>';
     }
     if (!st.sel && L.length) select(L[0].id);
     else if (st.sel) { const ev = E.find(e => e.id === st.sel); if (ev && ev.series && Station.isOpen(ev) && !st.playing) { if (st.cur >= ev.series.t.length - 2) st.cur = ev.series.t.length - 1; drawReplay(); } }
@@ -89,7 +89,7 @@ const Events = (() => {
       <h3 style="margin-top:14px">电—热证据同步回放 <span class="sub">${ev.series ? '热通道与电通道共享时间轴' : '人工提交的红外证据'}</span></h3>
       ${ev.series ? `
         <canvas id="ev-rp-T" style="height:130px"></canvas><canvas id="ev-rp-E" style="height:130px;margin-top:4px"></canvas>
-        <div class="row" style="margin-top:6px"><button class="btn sm" id="ev-play">▶ 回放</button><input type="range" id="ev-cur" min="0" max="${ev.series.t.length - 1}" value="${st.cur}" style="flex:1"><span id="ev-cur-v" class="muted" style="font-size:12px;min-width:330px"></span></div>`
+        <div class="row" style="margin-top:6px"><button class="btn sm" id="ev-play">回放</button><input type="range" id="ev-cur" min="0" max="${ev.series.t.length - 1}" value="${st.cur}" style="flex:1"><span id="ev-cur-v" class="muted" style="font-size:12px;min-width:330px"></span></div>`
         : ev.image ? `<img src="${ev.image}" style="width:100%;border-radius:8px">` : '<div class="hint">无证据数据</div>'}
       <h3 style="margin-top:14px">处理记录</h3>
       <div class="tablewrap" style="max-height:220px"><table class="t"><thead><tr><th style="width:76px">时间</th><th style="width:90px">操作人</th><th style="width:120px">动作</th><th>说明</th></tr></thead>
@@ -105,7 +105,7 @@ const Events = (() => {
     const ev = Station.state().events.find(e => e.id === st.sel); if (!ev || !ev.series) return;
     if (st.cur >= ev.series.t.length - 1) st.cur = 0;
     const stepN = Math.max(1, Math.round(ev.series.t.length / 150));
-    U.$('#ev-play').textContent = '⏸ 暂停';
+    U.$('#ev-play').textContent = '暂停';
     st.playing = setInterval(() => {
       st.cur = Math.min(ev.series.t.length - 1, st.cur + stepN);
       const r = U.$('#ev-cur'); if (r) { r.max = ev.series.t.length - 1; r.value = st.cur; }
@@ -113,16 +113,16 @@ const Events = (() => {
       if (st.cur >= ev.series.t.length - 1) stop();
     }, 60);
   }
-  function stop() { if (st.playing) clearInterval(st.playing); st.playing = null; const b = U.$('#ev-play'); if (b) b.textContent = '▶ 回放'; }
+  function stop() { if (st.playing) clearInterval(st.playing); st.playing = null; const b = U.$('#ev-play'); if (b) b.textContent = '回放'; }
 
   function drawReplay() {
     const ev = Station.state().events.find(e => e.id === st.sel); if (!ev || !ev.series || !U.$('#ev-rp-T')) return;
     const s = ev.series, n = s.t.length; if (!n) return;
     const r = U.$('#ev-cur'); if (r) r.max = n - 1;
     const i = U.clamp(st.cur, 0, n - 1), x = s.t.map(t => (t - ev.tStart) / 60), xc = x[i];
-    const vl = [{ x: 0, label: '事件触发', color: '#f97316' }, { x: xc, color: '#e2e8f0' }];
+    const vl = [{ x: 0, label: '事件触发', color: '#f97316' }, { x: xc, color: U.theme().strong }];
     U.lineChart(U.$('#ev-rp-T'), { series: [{ x, y: s.T, color: '#f97316', label: `${ev.loc} 故障点温度 ℃` }, { x, y: s.dT, color: '#fbbf24', label: 'ΔT (K)', dash: [4, 3] }], vlines: vl, xFmt: v => v.toFixed(1) + ' min' });
-    U.lineChart(U.$('#ev-rp-E'), { series: [{ x, y: s.I, color: '#22d3ee', label: `S${ev.r + 1} 组串电流 A` }, { x, y: s.pa.map(v => v * 10), color: '#ef4444', label: 'P(电弧)×10' }], vlines: vl, yMin: 0, xFmt: v => v.toFixed(1) + ' min' });
+    U.lineChart(U.$('#ev-rp-E'), { series: [{ x, y: s.I, color: '#00bcd4', label: `S${ev.r + 1} 组串电流 A` }, { x, y: s.pa.map(v => v * 10), color: '#ef4444', label: 'P(电弧)×10' }], vlines: vl, yMin: 0, xFmt: v => v.toFixed(1) + ' min' });
     const tNow = hms(s.t[i]);
     const near = Station.state().log.filter(e => Math.abs(e.t - s.t[i]) <= 2 && (e.loc === ev.loc || e.loc === 'S' + (ev.r + 1))).map(e => e.type);
     U.$('#ev-cur-v').innerHTML = `${tNow} · T ${s.T[i].toFixed(1)} ℃ · ΔT ${s.dT[i].toFixed(1)} K · I ${s.I[i].toFixed(2)} A · P弧 ${(s.pa[i] * 100).toFixed(0)}%${near.length ? ` · <span style="color:#fbbf24">${near.join('、')}</span>` : ''}`;

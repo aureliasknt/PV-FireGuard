@@ -101,7 +101,7 @@ const Hotspot = (() => {
       });
       rv.status = '已确认'; rv.ev = ev.id;
       DATA.audit('热异常复核：确认', `${st.src.loc} #${i + 1} → ${ev.id}`);
-      U.toast(`已确认并建档：${ev.id}（见模块⑤ 事件管理）`, 'ok');
+      U.toast(`已建档 ${ev.id}`, 'ok');
     }
     renderTable();
   }
@@ -112,7 +112,7 @@ const Hotspot = (() => {
       const rv = st.review[i];
       const act = rv.ev ? U.tag('已确认 → ' + rv.ev, 'ok') : rv.status === '误报' ? U.tag('误报', 'info')
         : `${U.tag(rv.status, rv.status.startsWith('待') ? 'yellow' : 'info')} <button class="btn sm" data-rv="ok" data-i="${i}">确认</button><button class="btn sm" data-rv="no" data-i="${i}">误报</button>`;
-      return `<tr><td>${i + 1}</td><td style="color:${VIS.CLS_COLORS[r.cls]}">${VIS.CLS_NAMES[r.cls]}</td><td>${r.part}<div class="muted" style="font-size:11px">${r.pos}</div></td><td>${(r.conf * 100).toFixed(0)}%</td><td>${r.dTmax.toFixed(1)} / ${r.dTmean.toFixed(1)} K</td><td>${r.area} px</td><td>${U.tag(r.grade.name, r.grade.lv)}</td><td style="white-space:nowrap">${act}</td></tr>`;
+      return `<tr><td>${i + 1}</td><td style="color:${VIS.CLS_COLORS[r.cls]}">${VIS.CLS_NAMES[r.cls]}</td><td>${r.part}<div class="muted" style="font-size:12px">${r.pos}</div></td><td>${(r.conf * 100).toFixed(0)}%</td><td>${r.dTmax.toFixed(1)} / ${r.dTmean.toFixed(1)} K</td><td>${r.area} px</td><td>${U.tag(r.grade.name, r.grade.lv)}</td><td style="white-space:nowrap">${act}</td></tr>`;
     }).join('') || '<tr><td colspan="8" class="muted">无</td></tr>';
   }
 
@@ -131,7 +131,7 @@ const Hotspot = (() => {
     let dmax = res.th; for (const v of res.dT) dmax = Math.max(dmax, v);
     U.drawField(U.$('#hs-f4'), res.dT, W, H, 'diverge', -dmax, dmax, 1);
     const sc = 2, c4 = U.drawField(U.$('#hs-c4'), res.dT, W, H, 'iron', 0, dmax, sc);
-    c4.setLineDash([4, 3]); c4.lineWidth = 1.5; c4.strokeStyle = '#22d3ee';
+    c4.setLineDash([4, 3]); c4.lineWidth = 1.5; c4.strokeStyle = '#00bcd4';
     res.regions.forEach(r => c4.strokeRect(r.box[0] * sc, r.box[1] * sc, (r.box[2] - r.box[0]) * sc, (r.box[3] - r.box[1]) * sc));
     c4.setLineDash([]);
     U.$('#hs-cap4').textContent = `连通候选 ${res.nProposals} 个 → 保留 ${res.regions.length} 个（阈值 ${res.th.toFixed(1)} K，背景中位温度 ${res.med.toFixed(1)} ℃）`;
@@ -157,7 +157,7 @@ const Hotspot = (() => {
     const real = res.regions.filter(r => VIS.CLS[r.cls] !== 'reflect');
     const worst = real.reduce((a, r) => (!a || r.grade.g > a.grade.g) ? r : a, null);
     U.$('#hs-verdict').innerHTML = !res.regions.length
-      ? `<div class="big-verdict" style="color:#22c55e">✓ 未发现热异常</div>`
+      ? `<div class="big-verdict" style="color:#22c55e">未发现热异常</div>`
       : worst
         ? `<div class="big-verdict" style="color:${VIS.CLS_COLORS[worst.cls]}">${VIS.CLS_NAMES[worst.cls]} · ${worst.part} · ${worst.grade.name}</div><div class="hint" style="margin-bottom:8px">${advice(VIS.CLS[worst.cls], worst.grade.g)} 结果需人工复核确认后进入事件档案。</div>`
         : `<div class="big-verdict" style="color:#94a3b8">仅检测到疑似反光伪热斑，已抑制告警（待复核）</div>`;
@@ -185,7 +185,7 @@ const Hotspot = (() => {
     let mi = 0; for (let i = 1; i < res.dT.length; i++) if (res.dT[i] > res.dT[mi]) mi = i;
     const y = Math.floor(mi / W), row = Array.from(s.T.subarray(y * W, y * W + W)), gr = Array.from(res.g.subarray(y * W, y * W + W));
     U.lineChart(U.$('#hs-profile'), {
-      series: [{ y: row, color: '#f97316', width: 1, label: `原始温度 (y=${y})` }, { y: gr, color: '#22d3ee', label: '高斯平滑' }],
+      series: [{ y: row, color: '#f97316', width: 1, label: `原始温度 (y=${y})` }, { y: gr, color: '#00bcd4', label: '高斯平滑' }],
       hlines: [{ y: res.med, label: '背景中位温度', color: '#94a3b8', left: true, below: true }, { y: res.med + res.th, label: '检出阈值', color: '#ef4444', left: true }],
       xLabel: '像素列', yLabel: '℃'
     });

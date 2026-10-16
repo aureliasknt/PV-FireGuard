@@ -1,7 +1,7 @@
 'use strict';
 /* 页面路由与启动 */
 const Main = (() => {
-  const PAGES = { station: Station, hotspot: Hotspot, arc: Arc, risk: Risk, report: Events, data: DataPage, about: null };
+  const PAGES = { station: Station, hotspot: Hotspot, arc: Arc, risk: Risk, report: Events, data: DataPage, settings: Settings, about: null };
   let cur = 'station';
 
   function go(p) {
@@ -17,6 +17,7 @@ const Main = (() => {
   function start() {
     window.addEventListener('error', e => U.toast('运行错误：' + (e.message || e), 'danger', 6000));
     U.$$('#nav button').forEach(b => b.onclick = () => go(b.dataset.page));
+    Settings.init();
     Arc.init(); Hotspot.init(); Risk.init(); Events.init(); Report.init(); Station.init(); DataPage.init();
     let rt = null;
     window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { const m = PAGES[cur]; if (m && m.onShow) m.onShow(); }, 150); });

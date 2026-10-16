@@ -120,7 +120,7 @@ const Arc = (() => {
     const h = st.hist; if (!h.loss.length) return;
     const lmax = Math.max(...h.loss.slice(0, 3), 0.5);
     U.lineChart(U.$('#arc-curve'), {
-      series: [{ y: h.loss.map(v => v / lmax), color: '#f97316', label: '训练损失(归一)' }, { y: h.vloss.map(v => v / lmax), color: '#fbbf24', label: '测试损失', dash: [4, 3] }, { y: h.acc, color: '#22d3ee', label: '测试准确率' }],
+      series: [{ y: h.loss.map(v => v / lmax), color: '#f97316', label: '训练损失(归一)' }, { y: h.vloss.map(v => v / lmax), color: '#fbbf24', label: '测试损失', dash: [4, 3] }, { y: h.acc, color: '#00bcd4', label: '测试准确率' }],
       yMin: 0, yMax: 1.05, xLabel: '训练轮次'
     });
   }
@@ -130,17 +130,17 @@ const Arc = (() => {
     const { ctx, w, h } = s, cm = st.eval.cm, n = cm.length;
     const names = ['正常', '串联弧', '并联弧', '逆变噪声', '辐照扰动'];
     const m = { l: 62, t: 8, r: 6, b: 34 }, cw = (w - m.l - m.r) / n, ch = (h - m.t - m.b) / n;
-    ctx.font = '11px "Microsoft YaHei",sans-serif';
+    ctx.font = '12px "Microsoft YaHei",sans-serif';
     for (let r = 0; r < n; r++) {
       const rs = cm[r].reduce((a, b) => a + b, 0) || 1;
       for (let k = 0; k < n; k++) {
         const v = cm[r][k] / rs;
-        ctx.fillStyle = r === k ? `rgba(34,211,238,${0.12 + 0.75 * v})` : `rgba(239,68,68,${v > 0 ? 0.15 + 0.7 * v : 0.04})`;
+        ctx.fillStyle = r === k ? `rgba(0,188,212,${0.12 + 0.75 * v})` : `rgba(239,68,68,${v > 0 ? 0.15 + 0.7 * v : 0.04})`;
         ctx.fillRect(m.l + k * cw + 1, m.t + r * ch + 1, cw - 2, ch - 2);
-        ctx.fillStyle = '#e2e8f0'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = U.theme().strong; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(cm[r][k], m.l + k * cw + cw / 2, m.t + r * ch + ch / 2);
       }
-      ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right'; ctx.fillText(names[r], m.l - 6, m.t + r * ch + ch / 2);
+      ctx.fillStyle = U.theme().text; ctx.textAlign = 'right'; ctx.fillText(names[r], m.l - 6, m.t + r * ch + ch / 2);
       ctx.textAlign = 'center'; ctx.fillText(names[r], m.l + r * cw + cw / 2, h - m.b + 12);
     }
     ctx.fillText('预测类别 →', m.l + (w - m.l - m.r) / 2, h - 6);
@@ -151,7 +151,7 @@ const Arc = (() => {
     const order = st.imp.map((v, i) => i).sort((a, b) => st.imp[b] - st.imp[a]);
     U.barChart(U.$('#arc-imp'), {
       labels: order.map(i => DSP.FEATURE_NAMES[i]), values: order.map(i => st.imp[i] * 100),
-      colors: order.map(i => ['#38bdf8', '#22d3ee', '#a78bfa', '#f472b6'][i < 5 ? 0 : i < 10 ? 1 : i < 13 ? 2 : 3]),
+      colors: order.map(i => ['#38bdf8', '#00bcd4', '#a78bfa', '#f472b6'][i < 5 ? 0 : i < 10 ? 1 : i < 13 ? 2 : 3]),
       fmt: v => v.toFixed(1) + '%'
     });
   }
@@ -177,7 +177,7 @@ const Arc = (() => {
     U.$('#arc-chk').innerHTML = c.chk.items.map(([k, v, th, ok]) => `<tr><td>${k}</td><td>${v}</td><td class="muted">${th}</td><td>${ok ? U.tag('满足', 'ok') : U.tag('不满足', 'red')}</td></tr>`).join('');
     const t = Array.from(c.x, (_, i) => i / DSP.FS * 1000);
     U.lineChart(U.$('#arc-wave'), {
-      series: [{ y: Array.from(c.x), x: t, color: '#22d3ee', width: 1, label: '组串电流 I(t)' }],
+      series: [{ y: Array.from(c.x), x: t, color: '#00bcd4', width: 1, label: '组串电流 I(t)' }],
       xLabel: '时间 / ms', yLabel: '电流 / A',
       vlines: c.onset != null ? [{ x: c.onset / DSP.FS * 1000, label: '电弧起始', color: '#ef4444' }] : []
     });
@@ -248,7 +248,7 @@ const Arc = (() => {
     const c = U.$('#arc-timeline'), S = U.setup(c); if (!S) return;
     const { ctx, w, h } = S, n = s.out.length, m = { l: 36, r: 8, t: 10, b: 26 };
     const bw = (w - m.l - m.r) / n, ph = h - m.t - m.b;
-    ctx.font = '11px "Microsoft YaHei",sans-serif';
+    ctx.font = '12px "Microsoft YaHei",sans-serif';
     ctx.strokeStyle = 'rgba(239,68,68,.6)'; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(m.l, m.t + ph * 0.4); ctx.lineTo(w - m.r, m.t + ph * 0.4); ctx.stroke(); ctx.setLineDash([]);
     s.out.forEach((o, i) => {
@@ -260,8 +260,8 @@ const Arc = (() => {
     const X = ms => m.l + ms / s.winMs * bw;
     ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(X(s.tOn), m.t); ctx.lineTo(X(s.tOn), m.t + ph); ctx.stroke();
     ctx.fillStyle = '#fca5a5'; ctx.textAlign = 'left'; ctx.fillText('起弧', X(s.tOn) + 3, m.t + 10);
-    if (s.tDet != null) { ctx.strokeStyle = '#22d3ee'; ctx.beginPath(); ctx.moveTo(X(s.tDet), m.t); ctx.lineTo(X(s.tDet), m.t + ph); ctx.stroke(); ctx.fillStyle = '#67e8f9'; ctx.fillText('确认检出', X(s.tDet) + 3, m.t + 24); }
-    ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right'; ctx.fillText('P弧', m.l - 6, m.t + 8); ctx.fillText('0.6', m.l - 6, m.t + ph * 0.4 + 4);
+    if (s.tDet != null) { ctx.strokeStyle = '#00bcd4'; ctx.beginPath(); ctx.moveTo(X(s.tDet), m.t); ctx.lineTo(X(s.tDet), m.t + ph); ctx.stroke(); ctx.fillStyle = '#00bcd4'; ctx.fillText('确认检出', X(s.tDet) + 3, m.t + 24); }
+    ctx.fillStyle = U.theme().text; ctx.textAlign = 'right'; ctx.fillText('P弧', m.l - 6, m.t + 8); ctx.fillText('0.6', m.l - 6, m.t + ph * 0.4 + 4);
     ctx.textAlign = 'center';
     for (let t = 0; t <= n * s.winMs; t += 100) ctx.fillText(t + ' ms', Math.min(w - 24, X(t)), h - 8);
   }
@@ -272,9 +272,9 @@ const Arc = (() => {
     const ft = s => s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`;
     U.$('#arc-segs').innerHTML = segs.slice(0, 40).map(g => {
       const end = g.end != null ? g.end : S.t, ev = S.events.find(e => e.key === g.locate && e.tStart <= end && e.tLast >= g.start - 2);
-      return `<tr><td><b>${g.id}</b><div class="muted" style="font-size:11px">${g.loop}</div></td><td>${U.hms(11 * 3600 + g.start)} – ${g.end != null ? U.hms(11 * 3600 + g.end) : '<span style="color:#f97316">持续中</span>'}<div class="muted" style="font-size:11px">${ft(end - g.start)}</div></td>
+      return `<tr><td><b>${g.id}</b><div class="muted" style="font-size:12px">${g.loop}</div></td><td>${U.hms(11 * 3600 + g.start)} – ${g.end != null ? U.hms(11 * 3600 + g.end) : '<span style="color:#f97316">持续中</span>'}<div class="muted" style="font-size:12px">${ft(end - g.start)}</div></td>
         <td>${(g.peak * 100).toFixed(0)}%</td><td>${g.confirmed ? U.tag('连续窗确认', 'red') : U.tag('疑似', 'orange')}</td><td>${g.locate || '—'}</td><td class="muted" style="font-size:12px">${g.cls}；${evTxt(g.evidence)}</td><td>${ev ? ev.id : '—'}</td></tr>`;
-    }).join('') || '<tr><td colspan="7" class="muted">暂无疑似电弧事件。可在模块①加载“场景C：连接器松动 → 串联电弧”或在阵列中注入连接器串联电弧。</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="muted">暂无疑似电弧事件</td></tr>';
   }
 
   function drawAll() { drawCurve(); drawCM(); drawImp(); drawStream(); if (st.cur) renderResult(); }

@@ -71,7 +71,13 @@ const U = (() => {
     ctx.clearRect(0, 0, w, h);
     return { ctx, w, h };
   }
-  const C = { grid: 'rgba(148,163,184,0.13)', axis: '#64748b', text: '#94a3b8', font: '11px "Microsoft YaHei",system-ui,sans-serif' };
+  /* 画布界面色：随 <html data-theme> 切换；数据色与预警色不随主题变化 */
+  const THEMES = {
+    dark: { grid: 'rgba(255,255,255,0.06)', axis: '#3a3d44', text: '#8d9099', strong: '#e4e4e7', canvas: '#141518', cell: [38, 40, 46], cellLine: 'rgba(255,255,255,.07)', shade: 'rgba(20,21,24,.45)', burnt: '#3f3f46' },
+    light: { grid: 'rgba(0,0,0,0.07)', axis: '#c4c6cb', text: '#61646c', strong: '#1b1c1f', canvas: '#eeeff1', cell: [212, 214, 219], cellLine: 'rgba(255,255,255,.22)', shade: 'rgba(238,239,241,.55)', burnt: '#a1a1aa' }
+  };
+  const theme = () => THEMES[document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'];
+  const C = { get grid() { return theme().grid; }, get axis() { return theme().axis; }, get text() { return theme().text; }, font: '12px "Microsoft YaHei",sans-serif' };
 
   function niceStep(range, n) {
     const raw = range / Math.max(1, n);
@@ -122,7 +128,8 @@ const U = (() => {
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (let v = Math.ceil(xMin / xs) * xs; v <= xMax + 1e-9; v += xs) {
       ctx.strokeStyle = C.grid; ctx.beginPath(); ctx.moveTo(X(v), m.t); ctx.lineTo(X(v), m.t + ph); ctx.stroke();
-      ctx.fillStyle = C.text; ctx.fillText(opt.xFmt ? opt.xFmt(v) : tickFmt(v, xs), X(v), m.t + ph + 5);
+      const lab = opt.xFmt ? opt.xFmt(v) : tickFmt(v, xs), hw = ctx.measureText(lab).width / 2;
+      ctx.fillStyle = C.text; ctx.fillText(lab, U_clampX(X(v), hw, w), m.t + ph + 5);
     }
     ctx.strokeStyle = C.axis; ctx.strokeRect(m.l, m.t, pw, ph);
     if (opt.xLabel) { ctx.fillStyle = C.text; ctx.textAlign = 'center'; ctx.fillText(opt.xLabel, m.l + pw / 2, h - 14); }
@@ -133,8 +140,8 @@ const U = (() => {
       if (hl.label) { ctx.fillStyle = hl.color || '#f97316'; ctx.textAlign = hl.left ? 'left' : 'right'; ctx.textBaseline = hl.below ? 'top' : 'bottom'; ctx.fillText(hl.label, hl.left ? m.l + 4 : w - m.r - 4, Y(hl.y) + (hl.below ? 2 : -2)); }
     });
     (opt.vlines || []).forEach(vl => {
-      ctx.strokeStyle = vl.color || '#22d3ee'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(vl.x), m.t); ctx.lineTo(X(vl.x), m.t + ph); ctx.stroke(); ctx.setLineDash([]);
-      if (vl.label) { ctx.fillStyle = vl.color || '#22d3ee'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(vl.label, X(vl.x) + 4, m.t + 4 + (vl.dy || 0)); }
+      ctx.strokeStyle = vl.color || '#00bcd4'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(vl.x), m.t); ctx.lineTo(X(vl.x), m.t + ph); ctx.stroke(); ctx.setLineDash([]);
+      if (vl.label) { ctx.fillStyle = vl.color || '#00bcd4'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(vl.label, X(vl.x) + 4, m.t + 4 + (vl.dy || 0)); }
     });
     series.forEach(se => {
       const n = se.y.length;
@@ -145,7 +152,7 @@ const U = (() => {
         ctx.lineTo(X(xv(n - 1)), Y(Math.max(yMin, 0))); ctx.closePath();
         ctx.fillStyle = se.fill; ctx.fill();
       }
-      ctx.strokeStyle = se.color || '#22d3ee'; ctx.lineWidth = se.width || 1.5;
+      ctx.strokeStyle = se.color || '#00bcd4'; ctx.lineWidth = se.width || 1.5;
       if (se.dash) ctx.setLineDash(se.dash);
       ctx.beginPath();
       let started = false;
@@ -162,12 +169,14 @@ const U = (() => {
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       series.forEach(se => {
         if (!se.label) return;
-        ctx.fillStyle = se.color || '#22d3ee'; ctx.fillRect(lx, 8, 14, 3);
+        ctx.fillStyle = se.color || '#00bcd4'; ctx.fillRect(lx, 8, 14, 3);
         ctx.fillStyle = C.text; ctx.fillText(se.label, lx + 18, 10);
         lx += 26 + ctx.measureText(se.label).width;
       });
     }
   }
+
+  const U_clampX = (x, hw, w) => Math.max(hw + 1, Math.min(w - hw - 1, x));
 
   /* 横向条形图（支持正负值）opt: {labels, values, colors|color, fmt, max} */
   function barChart(canvas, opt) {
@@ -187,11 +196,11 @@ const U = (() => {
       const y = m.t + i * rowH, v = vals[i];
       ctx.fillStyle = C.text; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
       ctx.fillText(opt.labels[i], m.l - 8, y + rowH / 2);
-      const col = Array.isArray(opt.colors) ? opt.colors[i] : (opt.color || (v >= 0 ? '#22d3ee' : '#22c55e'));
+      const col = Array.isArray(opt.colors) ? opt.colors[i] : (opt.color || (v >= 0 ? '#00bcd4' : '#22c55e'));
       ctx.fillStyle = col;
       const x0 = X(0), x1 = X(v), bh = Math.min(16, rowH * 0.66);
       ctx.fillRect(Math.min(x0, x1), y + (rowH - bh) / 2, Math.max(1, Math.abs(x1 - x0)), bh);
-      ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'left';
+      ctx.fillStyle = theme().strong; ctx.textAlign = 'left';
       ctx.fillText(opt.fmt ? opt.fmt(v) : fmt(v, 2), Math.max(x0, x1) + 4, y + rowH / 2);
     }
     if (lo < 0) { ctx.strokeStyle = C.axis; ctx.beginPath(); ctx.moveTo(X(0), m.t); ctx.lineTo(X(0), h - m.b); ctx.stroke(); }
@@ -258,17 +267,17 @@ const U = (() => {
     });
     ctx.globalAlpha = 1;
     const ang = Math.PI + clamp(value, 0, 100) / 100 * Math.PI;
-    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.strokeStyle = theme().strong; ctx.lineWidth = 3; ctx.beginPath();
     ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * (r - 6), cy + Math.sin(ang) * (r - 6)); ctx.stroke();
-    ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = theme().strong; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.font = `bold ${Math.round(r * 0.36)}px system-ui,sans-serif`; ctx.fillStyle = level(value).color;
+    ctx.font = `bold ${Math.round(r * 0.36)}px "Microsoft YaHei",sans-serif`; ctx.fillStyle = level(value).color;
     ctx.fillText(fmt(value, 0), cx, cy - r * 0.28);
     if (sub) { ctx.font = C.font; ctx.fillStyle = C.text; ctx.fillText(sub, cx, cy + 16); }
   }
 
   /* 雷达图 */
-  function radar(canvas, labels, values, color = '#22d3ee') {
+  function radar(canvas, labels, values, color = '#00bcd4') {
     const s = setup(canvas); if (!s) return;
     const { ctx, w, h } = s;
     const cx = w / 2, cy = h / 2 + 4, r = Math.min(w, h) / 2 - 34, n = labels.length;
@@ -323,6 +332,6 @@ const U = (() => {
   }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  return { range, sleep, $, $$, clamp, rand, randi, randn, pick, fmt, median, PAL, rgb, LEVELS, level, tag, setup, lineChart, barChart, heatmap, drawField, gauge, radar, toast, download, hms };
+  return { theme, range, sleep, $, $$, clamp, rand, randi, randn, pick, fmt, median, PAL, rgb, LEVELS, level, tag, setup, lineChart, barChart, heatmap, drawField, gauge, radar, toast, download, hms };
 })();
 if (typeof module !== 'undefined') module.exports = U;
