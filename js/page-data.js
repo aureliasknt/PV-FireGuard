@@ -50,11 +50,12 @@ const DataPage = (() => {
   }
 
   function renderFeatures() {
-    const n = DSP.FEATURE_NAMES;
+    const n = DSP.BASE_NAMES;
     const rows = [
-      ['电弧·时域', n.slice(0, 5).join('、'), 'CT-S1…S6 · 200 kHz', '电弧'],
-      ['电弧·频域/谱统计', n.slice(5, 13).join('、'), 'CT-S1…S6 · FFT/STFT', '电弧'],
-      ['电弧·小波', n.slice(13).join('、'), 'CT-S1…S6 · Haar 4 层', '电弧'],
+      ['电弧·时域', n.slice(0, 5).join('、'), '直流侧 + 交流侧 · 100 kHz', '电弧'],
+      ['电弧·频域/谱统计', n.slice(5, 13).join('、'), '直流侧 + 交流侧 · FFT/STFT', '电弧'],
+      ['电弧·小波', n.slice(13).join('、'), '直流侧 + 交流侧 · Haar 4 层', '电弧'],
+      ['电弧·实测数据集', `${REAL.records.length} 条记录 · ${REAL.LOADS.length} 类负载 · ${REAL.P.stats.keptWindows} 窗`, '5-30.rar → tools/preprocess_arc.py', '电弧训练/回放'],
       ['热·区域特征', 'ΔTmax、ΔTmean、面积、长宽比、填充率、边缘锐度、部位', 'IR-01/02 · 卷积特征图', '热异常'],
       ['热·时序特征', '温升速率 dT/dt、相对组串中位温差', 'IR + TC · 1 Hz 时序', '热异常 · 融合'],
       ['电气·运行量', '组串电压、电流、功率', 'VT/CT · 1 Hz 汇总', '监测 · 融合'],
@@ -84,7 +85,7 @@ const DataPage = (() => {
       <div class="k">疑似电弧异常时段</div><div class="v">${S.arcSegs.length} 段</div>`;
     const meta = Arc.meta;
     U.$('#ds-models').innerHTML = [
-      ['电弧判别 MLP', meta ? `17-${meta.nHid}-5` : '—', meta ? `准确率 ${(meta.acc * 100).toFixed(1)}%，检出率 ${(meta.recall * 100).toFixed(1)}%，误报率 ${(meta.far * 100).toFixed(1)}%` : '训练中', meta ? meta.time.toLocaleTimeString('zh-CN', { hour12: false }) : '—', Arc.ready ? U.tag('已部署', 'ok') : U.tag('训练中', 'yellow')],
+      ['电弧判别 MLP', meta ? `${meta.nIn}-${meta.nHid}-${meta.nOut}` : '—', meta ? `实测数据，单窗准确率 ${(meta.acc * 100).toFixed(1)}%，检出率 ${(meta.recall * 100).toFixed(1)}%，误报率 ${(meta.far * 100).toFixed(1)}%` : '训练中', meta ? meta.time.toLocaleTimeString('zh-CN', { hour12: false }) : '—', Arc.ready ? U.tag('已部署', 'ok') : U.tag('训练中', 'yellow')],
       ['热斑视觉流水线', 'v1.1', '6 类分类 + 部位定位 + 四级分级', '内置', U.tag('已部署', 'ok')],
       ['故障点热平衡模型', 'v1.0', '集总热容 + 对流辐射 + 劣化正反馈', '内置', U.tag('已部署', 'ok')],
       ['电—热融合判据', FUSE.VERSION, '6 项判据 · 12 条分级规则', '—', U.tag('生效中', 'ok')]

@@ -292,3 +292,9 @@ ul.why { margin: 0; padding: 0; list-style: none; font-size: var(--fs-s); line-h
 .set-row:last-child { border-bottom: 0; }
 .set-row .k { color: var(--muted); font-size: var(--fs-s); }
 .set-row .seg { justify-self: start; }
+
+/* 电弧诊断 · 实测记录矩阵 */
+.rchip { display: inline-block; margin: 1px 4px 1px 0; padding: 0 6px; border-radius: var(--r-s); border: 1px solid var(--line); background: var(--sunk); color: var(--muted); font-size: var(--fs-s); line-height: 20px; cursor: pointer; white-space: nowrap; }
+.rchip.train { background: var(--accent-weak); color: var(--text); border-color: transparent; }
+.rchip:hover { border-color: var(--accent); }
+.rchip.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--text); }

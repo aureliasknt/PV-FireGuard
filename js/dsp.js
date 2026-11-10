@@ -1,11 +1,14 @@
 'use strict';
-/* 直流侧电流信号仿真 + 时域/频域/时频域/小波多域特征提取 */
+/* 电流信号处理：FFT、STFT 与时域/频域/谱统计/小波多域特征提取
+   信号源为电弧实验平台实测数据（data/arc-real.js，100 kHz，直流侧 + 交流侧双通道），见 real.js */
 const DSP = (() => {
-  const FS = 200000;   // 采样率 200 kHz
-  const N = 2048;      // 窗长 10.24 ms
-  const CLASSES = ['normal', 'series', 'parallel', 'inverter', 'irradiance'];
-  const CLASS_NAMES = ['正常运行', '串联电弧', '并联电弧', '逆变器噪声干扰', '辐照/MPPT扰动'];
-  const CLASS_COLORS = ['#22c55e', '#ef4444', '#f97316', '#a78bfa', '#38bdf8'];
+  const FS = 100000;   // 采集卡采样率 100 kHz
+  const N = 1024;      // 窗长 10.24 ms
+  const CLASSES = ['normal', 'dc', 'ac'];
+  const CLASS_NAMES = ['正常运行', '直流侧电弧', '交流侧电弧'];
+  const CLASS_COLORS = ['#22c55e', '#ef4444', '#f97316'];
+  const CH = ['DC', 'AC'];
+  const CH_NAMES = ['直流侧', '交流侧'];
 
   function fft(re, im) {
     const n = re.length;
@@ -44,66 +47,23 @@ const DSP = (() => {
     return mag;
   }
 
-  /* ---------- 信号仿真 ---------- */
-  function generate(type, o = {}) {
-    const n = o.n || N, I0 = o.I0 != null ? o.I0 : 8, noise = o.noise != null ? o.noise : 1;
-    const sev = o.sev != null ? o.sev : U.rand(0.4, 1);
-    const x = new Float64Array(n);
-    const fsw = U.rand(15000, 20000), ph = U.rand(0, 6.28), ph2 = U.rand(0, 6.28);
-    const aRip = 0.02 * I0 * U.rand(0.5, 1), aSw = 0.004 * I0 * U.rand(0.6, 1.4), sig = 0.003 * I0 * noise;
-    const isArc = type === 'series' || type === 'parallel';
-    const onset = isArc ? (o.onset != null ? o.onset : Math.floor(n * U.rand(0, 0.5))) : n;
-    for (let i = 0; i < n; i++) {
-      const t = i / FS;
-      x[i] = I0 + aRip * Math.sin(2 * Math.PI * 100 * t + ph)
-        + aSw * Math.sin(2 * Math.PI * fsw * t + ph2) + 0.4 * aSw * Math.sin(4 * Math.PI * fsw * t)
-        + sig * U.randn();
-    }
-    if (type === 'inverter') {
-      // 强开关谐波 + 周期性开关尖峰振铃（窄带、周期性）
-      const k = U.rand(4, 9), period = FS / fsw, fr = U.rand(60000, 90000), amp = 0.05 * I0 * U.rand(0.5, 1.2);
-      for (let i = 0; i < n; i++) {
-        const t = i / FS;
-        for (let hN = 1; hN <= 5; hN++) x[i] += k * aSw / hN * Math.sin(2 * Math.PI * fsw * hN * t + ph2 * hN);
-        const tau = (i % period);
-        x[i] += amp * Math.exp(-tau / 2.5) * Math.sin(2 * Math.PI * fr * tau / FS);
-      }
-    } else if (type === 'irradiance') {
-      // 阶跃/斜坡（MPPT 扰动或云影边缘）
-      const dI = I0 * U.rand(0.06, 0.25) * (Math.random() < 0.5 ? -1 : 1);
-      const c = n * U.rand(0.2, 0.8), tau = U.rand(20, 200);
-      for (let i = 0; i < n; i++) x[i] += dI / (1 + Math.exp(-(i - c) / tau));
-    } else if (isArc) {
-      const drop = type === 'series' ? I0 * U.rand(0.02, 0.08) * sev : I0 * U.rand(0.3, 0.65);
-      const sa = I0 * (type === 'series' ? U.rand(0.008, 0.028) * (0.4 + 0.6 * sev) : U.rand(0.02, 0.05));
-      let lp = 0, env = 1, next = onset;
-      for (let i = onset; i < n; i++) {
-        if (i >= next) { env = U.rand(0.3, 1.6); next = i + U.randi(40, 300); }
-        const wn = U.randn();
-        lp = 0.92 * lp + 0.4 * U.randn();
-        let v = sa * env * (0.65 * wn + 0.5 * lp);
-        if (Math.random() < 0.0025) v += (Math.random() < 0.5 ? -1 : 1) * sa * U.rand(4, 10);
-        const tr = Math.min(1, (i - onset) / 6);
-        x[i] += -drop * tr + v;
-      }
-    }
-    return { x, onset: isArc ? onset : null, type };
-  }
-
-  /* ---------- 特征提取 ---------- */
-  const FEATURE_NAMES = ['相对标准差', '差分标准差', '差分峭度', '峰峰值比', '均值阶跃',
-    '频带0.5-5k', '频带5-15k', '频带15-30k', '频带30-60k', '频带60-100k',
+  /* ---------- 单通道 17 维特征 ---------- */
+  const BASE_NAMES = ['相对标准差', '差分标准差', '差分峭度', '峰峰值比', '均值阶跃',
+    '频带0.5-5k', '频带5-10k', '频带10-20k', '频带20-35k', '频带35-50k',
     '谱熵', '谱平坦度', '谱峰均比', '小波D1', '小波D2', '小波D3', '小波D4'];
-  const BANDS = [[500, 5000], [5000, 15000], [15000, 30000], [30000, 60000], [60000, 100000]];
+  const NB = BASE_NAMES.length;
+  const FEATURE_NAMES = CH.flatMap(c => BASE_NAMES.map(n => `${c}·${n}`));
+  const BANDS = [[500, 5000], [5000, 10000], [10000, 20000], [20000, 35000], [35000, 50000]];
   const L10 = v => Math.log10(v + 1e-12);
+  const DOMAIN = i => { const j = i % NB; return j < 5 ? '时域' : j < 10 ? '频域' : j < 13 ? '谱统计' : '小波'; };
 
-  function features(x, keep) {
+  function features1(x) {
     const n = x.length;
     let mean = 0; for (let i = 0; i < n; i++) mean += x[i]; mean /= n;
-    const m = Math.max(Math.abs(mean), 0.3);
     let v = 0, mx = -Infinity, mn = Infinity;
     for (let i = 0; i < n; i++) { const d = x[i] - mean; v += d * d; if (x[i] > mx) mx = x[i]; if (x[i] < mn) mn = x[i]; }
     const sd = Math.sqrt(v / n);
+    const m = Math.max(Math.sqrt(mean * mean + sd * sd), 0.02);   // 以窗口有效值归一，消除负载电流大小的影响
     let dm = 0; for (let i = 1; i < n; i++) dm += x[i] - x[i - 1]; dm /= (n - 1);
     let d2 = 0, d4 = 0;
     for (let i = 1; i < n; i++) { const d = x[i] - x[i - 1] - dm; d2 += d * d; d4 += d * d * d * d; }
@@ -131,13 +91,13 @@ const DSP = (() => {
       wav.push(L10(e / half / (m * m)));
       cur = ap;
     }
-    const values = [sd / m, Math.sqrt(d2) / m, L10(kurt), (mx - mn) / m, step, ...band, H, flat, pav, ...wav];
-    if (keep) keep.spectrum = sp;
-    return values;
+    return [sd / m, Math.sqrt(d2) / m, L10(kurt), (mx - mn) / m, step, ...band, H, flat, pav, ...wav];
   }
+  /* 双通道 34 维特征：直流侧 17 维 + 交流侧 17 维 */
+  const features = (dc, ac) => features1(dc).concat(features1(ac));
 
   /* 短时傅里叶变换：返回 [bin][frame] 的 dB 矩阵（低频在下） */
-  function stft(x, win = 256, hop = 64) {
+  function stft(x, win = 128, hop = 32) {
     const frames = Math.floor((x.length - win) / hop) + 1, bins = win / 2;
     const M = []; for (let b = 0; b < bins; b++) M.push(new Array(frames));
     for (let f = 0; f < frames; f++) {
@@ -147,6 +107,6 @@ const DSP = (() => {
     return M;
   }
 
-  return { FS, N, CLASSES, CLASS_NAMES, CLASS_COLORS, FEATURE_NAMES, fft, spectrum, generate, features, stft };
+  return { FS, N, CLASSES, CLASS_NAMES, CLASS_COLORS, CH, CH_NAMES, NB, BASE_NAMES, FEATURE_NAMES, DOMAIN, fft, spectrum, features, features1, stft };
 })();
 if (typeof module !== 'undefined') module.exports = DSP;

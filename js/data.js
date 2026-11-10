@@ -10,7 +10,7 @@ const DATA = (() => {
   const KIND = { current: '直流电流', voltage: '直流电压', tc: '背板热电偶', ir: '红外热像', weather: '气象' };
   const SOURCES = [];
   const add = (id, kind, maps, proto, rate, fast) => SOURCES.push({ id, kind, maps, proto, rate, fast, fault: null, offset: U.rand(-0.2, 0.2), recv: 0, miss: 0, lastT: 0 });
-  for (let r = 0; r < 6; r++) add(`CT-S${r + 1}`, 'current', `组串 S${r + 1}（${loopOf(r).cb}）`, '高速采集卡 PCIe', '200 kHz', true);
+  for (let r = 0; r < 6; r++) add(`CT-S${r + 1}`, 'current', `组串 S${r + 1}（${loopOf(r).cb}）`, '高速采集卡 PCIe', '100 kHz', true);
   for (let r = 0; r < 6; r++) add(`VT-S${r + 1}`, 'voltage', `组串 S${r + 1}（${loopOf(r).cb}）`, '高速采集卡 PCIe', '10 kHz', true);
   for (let r = 0; r < 6; r++) add(`TC-S${r + 1}`, 'tc', `S${r + 1} 组件背板 ×3`, 'Modbus RTU', '1 Hz', false);
   add('IR-01', 'ir', 'S1–S3 全部组件、连接器', 'GigE Vision', '1 fps', true);

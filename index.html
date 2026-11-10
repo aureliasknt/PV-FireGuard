@@ -23,7 +23,7 @@
     <div class="navgroup">模块</div>
     <button data-page="station" class="active"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M6.5 11h2.5l1.5-3 3 6 1.5-3h2.5"/><path d="M9 21h6M12 17v4"/></svg></span>电站状态监测</button>
     <button data-page="hotspot"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/><circle cx="12" cy="17.5" r="1.2" fill="currentColor"/></svg></span>热异常诊断</button>
-    <button data-page="arc"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></span>直流电弧诊断</button>
+    <button data-page="arc"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></span>电弧诊断</button>
     <button data-page="risk"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.5 5.8v5.7c0 4.6 3.1 8.4 7.5 9.7 4.4-1.3 7.5-5.1 7.5-9.7V5.8z"/><path d="M12 8v5"/><circle cx="12" cy="16.3" r="1" fill="currentColor"/></svg></span>电—热融合评估</button>
     <button data-page="report"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span>事件与报告</button>
     <div class="navgroup">系统</div>
@@ -176,57 +176,67 @@
     </div>
   </section>
 
-  <!-- ================= ③ 直流电弧故障诊断 ================= -->
+  <!-- ================= ③ 电弧故障诊断（实测数据） ================= -->
   <section class="page" id="page-arc">
-    <div class="page-title"><h2>直流电弧诊断</h2><p>200 kHz · 17 维特征 · 连续窗确认</p></div>
+    <div class="page-title"><h2>电弧故障诊断</h2><p>实测数据 · 100 kHz 双通道 · 34 维特征 · 连续窗确认</p></div>
     <div class="grid g2">
-      <div class="card"><h3>组串回路实时监测 <span class="sub">组串 → 汇流箱 → MPPT</span></h3><div class="strings" id="arc-strings"></div></div>
+      <div class="card"><h3>组串回路实时监测 <span class="sub">信号回放自实测记录</span></h3><div class="strings" id="arc-strings"></div></div>
       <div class="card"><h3>疑似电弧事件 </h3>
         <div class="tablewrap" style="max-height:330px"><table class="t"><thead><tr><th>关联回路</th><th>异常时段</th><th>峰值P</th><th>结论</th><th>定位</th><th>诊断证据</th><th>事件</th></tr></thead><tbody id="arc-segs"></tbody></table></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h3>实测数据集与预处理 <span class="sub">5-30.rar · 电弧实验平台</span></h3>
+        <table class="t"><thead><tr><th>步骤</th><th>处理</th><th>结果</th></tr></thead><tbody id="arc-ds-steps"></tbody></table>
+        <h3 style="margin-top:14px">记录矩阵 <span class="sub">点击选择记录 · 蓝色=训练集，灰色=测试集</span></h3>
+        <table class="t"><thead><tr><th>负载类型</th><th>无电弧</th><th>直流侧电弧</th><th>交流侧电弧</th></tr></thead><tbody id="arc-ds-mat"></tbody></table>
+      </div>
+      <div class="card"><h3>记录全时段概览 <span class="sub" id="arc-ov-sub"></span></h3>
+        <canvas id="arc-ov" style="height:250px"></canvas>
+        <div class="hint">每 0.1 s 统计一次，各曲线按自身最大值归一化；虚线 = 抽取的 4 段连续采样（每段 10 窗 ≈ 102 ms），实线 = 当前诊断窗口。</div>
+      </div>
     </div>
     <div class="grid side-main">
       <div class="card">
         <h3>信号源</h3>
-        <label class="f"><div class="lab">工况类型</div><select id="arc-type"></select></label>
-        <label class="f"><div class="lab">组串电流 I<b id="arc-I-v"></b></div><input type="range" id="arc-I" min="2" max="12" step="0.5" value="8"></label>
-        <label class="f"><div class="lab">电弧强度<b id="arc-sev-v"></b></div><input type="range" id="arc-sev" min="0.1" max="1" step="0.05" value="0.6"></label>
-        <label class="f"><div class="lab">背景噪声倍率<b id="arc-noise-v"></b></div><input type="range" id="arc-noise" min="0.5" max="4" step="0.1" value="1"></label>
+        <label class="f"><div class="lab">实测记录</div><select id="arc-rec"></select></label>
+        <label class="f"><div class="lab">窗口序号<b id="arc-w-v"></b></div><input type="range" id="arc-w" min="0" max="39" step="1" value="0"></label>
+        <label class="f"><div class="lab">叠加白噪声 σ<b id="arc-noise-v"></b></div><input type="range" id="arc-noise" min="0" max="60" step="2" value="0"></label>
         <fieldset class="fs"><legend>采集条件</legend>
-          <label class="f"><div class="lab">采集设备采样率</div><select id="arc-fs"><option value="200000" selected>200 kHz（标准）</option><option value="100000">100 kHz</option><option value="50000">50 kHz</option></select></label>
+          <label class="f"><div class="lab">采集设备采样率</div><select id="arc-fs"><option value="100000" selected>100 kHz（实验平台）</option><option value="50000">50 kHz</option><option value="20000">20 kHz</option></select></label>
           <label class="f"><div class="lab">数据丢失率<b id="arc-loss-v"></b></div><input type="range" id="arc-loss" min="0" max="5" step="0.1" value="0"></label>
           <label class="chk"><input type="checkbox" id="arc-sat">传感器量程饱和</label><div style="height:8px"></div>
         </fieldset>
-        <div class="row"><button class="btn primary" id="arc-gen">采集并诊断</button><button class="btn" id="arc-rand">随机工况</button></div>
+        <div class="row"><button class="btn primary" id="arc-gen">读取并诊断</button><button class="btn" id="arc-rand">随机窗口</button></div>
         <h3 style="margin-top:14px">采样要求核验</h3>
         <table class="t"><tbody id="arc-chk"></tbody></table>
         <div style="margin-top:14px"><h3>诊断结果</h3><div class="big-verdict" id="arc-verdict">—</div><div class="probs" id="arc-probs"></div><div class="probs" id="arc-evid"></div></div>
       </div>
       <div>
-        <div class="card" style="margin-bottom:14px"><h3>电流波形 <span class="sub">窗长 10.24 ms · fs = 200 kHz</span></h3><canvas id="arc-wave" style="height:190px"></canvas></div>
+        <div class="card" style="margin-bottom:14px"><h3>电流波形 <span class="sub" id="arc-wave-sub">窗长 10.24 ms · fs = 100 kHz</span></h3><canvas id="arc-wave" style="height:190px"></canvas></div>
         <div class="grid g2" style="margin-bottom:0">
-          <div class="card"><h3>幅值谱</h3><canvas id="arc-spec" style="height:190px"></canvas></div>
-          <div class="card"><h3>时频谱（STFT）</h3><canvas id="arc-stft" style="height:190px"></canvas></div>
+          <div class="card"><h3>幅值谱 <span class="sub">直流侧 / 交流侧</span></h3><canvas id="arc-spec" style="height:190px"></canvas></div>
+          <div class="card"><h3>时频谱（STFT） <span class="sub">直流侧</span></h3><canvas id="arc-stft" style="height:190px"></canvas></div>
         </div>
       </div>
     </div>
     <div class="grid g3">
-      <div class="card"><h3>多域特征向量</h3><div class="tablewrap" style="max-height:260px"><table class="t"><thead><tr><th>特征</th><th>域</th><th style="text-align:right">数值</th></tr></thead><tbody id="arc-feat"></tbody></table></div></div>
+      <div class="card"><h3>多域特征向量 <span class="sub">34 维</span></h3><div class="tablewrap" style="max-height:260px"><table class="t"><thead><tr><th>特征</th><th>域</th><th style="text-align:right">数值</th></tr></thead><tbody id="arc-feat"></tbody></table></div></div>
       <div class="card">
-        <div class="card-head"><h3>模型训练 </h3><button class="btn primary sm" id="arc-train">重新训练</button></div>
+        <div class="card-head"><h3>模型训练 <span class="sub">实测窗口</span></h3><button class="btn primary sm" id="arc-train">重新训练</button></div>
         <div class="row" style="margin-bottom:6px">
-          <label class="muted" style="font-size:12px">每类样本</label><select id="arc-n"><option>60</option><option selected>100</option><option>160</option></select>
+          <label class="muted" style="font-size:12px">划分</label><select id="arc-split"><option value="record" selected>按记录</option><option value="random">随机窗口</option></select>
           <label class="muted" style="font-size:12px">隐层</label><select id="arc-h"><option>8</option><option selected>16</option><option>32</option></select>
           <label class="muted" style="font-size:12px">轮数</label><select id="arc-ep"><option>40</option><option selected>80</option><option>150</option></select>
         </div>
         <canvas id="arc-curve" style="height:150px"></canvas>
         <div class="hint" id="arc-train-info">模型尚未训练</div>
       </div>
-      <div class="card"><h3>混淆矩阵 <span class="sub">测试集 30%</span></h3><canvas id="arc-cm" style="height:220px"></canvas></div>
+      <div class="card"><h3>混淆矩阵 <span class="sub" id="arc-cm-sub">测试集</span></h3><canvas id="arc-cm" style="height:220px"></canvas><div class="hint" id="arc-rec-acc"></div></div>
     </div>
     <div class="grid g2">
-      <div class="card"><h3>特征重要性 <span class="sub">置换法</span></h3><canvas id="arc-imp" style="height:300px"></canvas></div>
+      <div class="card"><h3>特征重要性 <span class="sub">置换法 · 前 15 项</span></h3><canvas id="arc-imp" style="height:300px"></canvas></div>
       <div class="card">
-        <div class="card-head"><h3>实时检测演示 <span class="sub">UL 1699B</span></h3><button class="btn primary sm" id="arc-stream">运行演示</button></div>
+        <div class="card-head"><h3>实时检测回放 <span class="sub">无弧记录 → 电弧记录 拼接</span></h3><button class="btn primary sm" id="arc-stream">运行回放</button></div>
         <canvas id="arc-timeline" style="height:150px"></canvas>
         <div class="kv" id="arc-stream-res" style="margin-top:10px"></div>
       </div>
@@ -326,7 +336,7 @@
       <div class="card"><div class="card-head"><h3>历史存储与事件归档</h3><button class="btn sm" id="ds-exp-hist">导出历史时序 CSV</button></div>
         <div class="kv" id="ds-store" style="grid-template-columns:200px 1fr"></div>
         <table class="t" style="margin-top:12px"><thead><tr><th>数据类别</th><th>存储粒度</th><th>保留策略</th></tr></thead><tbody>
-          <tr><td>原始电流波形</td><td>200 kHz，仅保留异常时段前后 10 s</td><td>90 天</td></tr>
+          <tr><td>原始电流波形</td><td>100 kHz 双通道，仅保留异常时段前后 10 s</td><td>90 天</td></tr>
           <tr><td>运行时序（V/I/T/环境）</td><td>1 Hz</td><td>1 年，之后降采样至 1 min</td></tr>
           <tr><td>红外热像</td><td>1 fps，异常帧全量保存</td><td>异常帧 3 年</td></tr>
           <tr><td>事件档案与处理记录</td><td>按事件</td><td>永久</td></tr></tbody></table></div>
@@ -393,7 +403,7 @@
       <div class="card"><h3>算法与参数说明</h3>
         <table class="t"><tbody>
           <tr><td>热像分级</td><td>ΔT &lt;10 K Ⅰ级观察；10–20 K Ⅱ级计划检修；20–40 K Ⅲ级尽快处理；≥40 K Ⅳ级紧急处置（参考 IEC TS 62446-3 思路）</td></tr>
-          <tr><td>电弧判别</td><td>5 类：正常 / 串联电弧 / 并联电弧 / 逆变器噪声 / 辐照扰动；P(电弧) ≥0.3 疑似，≥0.6 且连续 2 窗确认</td></tr>
+          <tr><td>电弧判别</td><td>实测数据训练（5-30.rar，5 类负载 × 29 条记录）；3 类：正常 / 直流侧电弧 / 交流侧电弧；直流侧 + 交流侧各 17 维特征；P(电弧) ≥0.3 疑似，≥0.6 且连续 2 窗确认</td></tr>
           <tr><td>融合判据</td><td>C1 温差、C2 温升速率、C3 故障点温度、C4 电弧特征、C5 电—热同回路关联、C6 环境加剧 → 蓝/黄/橙/红 与 P4–P1 处置优先级</td></tr>
           <tr><td>热平衡模型</td><td>C·dT/dt = P_f(1+1.5D) + αGA − h·A(T−Ta) − εσA(T⁴−Ta⁴) − g(T−T_bg)，h = 2(5.7+3.8v)</td></tr>
         </tbody></table></div>
@@ -401,12 +411,12 @@
         <ol class="recos">
           <li>电站状态监测：加载场景或点击组件注入故障。</li>
           <li>热异常诊断：确认或驳回待复核结果。</li>
-          <li>直流电弧诊断：查看异常时段、回路与证据；可改采集条件。</li>
+          <li>电弧诊断：选择实测记录与窗口，查看波形、频谱、特征与判别结果；可改采集条件。</li>
           <li>电—热融合评估：逐项核验判据。</li>
           <li>事件与报告：处理事件、回放证据、导出报告。</li>
           <li>数据与系统：测点故障模拟、判据修改、角色切换、操作日志。</li>
         </ol>
-        <p class="hint">说明：当前版本采用基于物理规律的仿真数据进行演示，模型参数与判据阈值为示意值；接入实验平台采集数据后可替换训练集、模型参数并完成判据验证。</p></div>
+        <p class="hint">说明：电弧诊断模块使用电弧实验平台实测数据（5-30.rar，经 tools/preprocess_arc.py 预处理）训练与回放；红外热像、热平衡与风险评估部分仍为基于物理规律的仿真，判据阈值为示意值。</p></div>
     </div>
   </section>
   </main>
@@ -415,7 +425,9 @@
 <script src="js/util.js"></script>
 <script src="js/data.js"></script>
 <script src="js/fusion.js"></script>
+<script src="data/arc-real.js"></script>
 <script src="js/dsp.js"></script>
+<script src="js/real.js"></script>
 <script src="js/ml.js"></script>
 <script src="js/thermal.js"></script>
 <script src="js/vision.js"></script>

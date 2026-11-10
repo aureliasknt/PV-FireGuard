@@ -206,7 +206,7 @@ const Report = (() => {
       <p>告警统计：红色 ${cnt.red}，橙色 ${cnt.orange}，黄色 ${cnt.yellow}，联动处置 ${cnt.action}。${Object.keys(byType).length ? '主要告警类型：' + Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ×${v}`).join('；') : ''}</p>
 
       ${H('算法模型与预警判据')}
-      <table>${row('电弧判别模型', meta ? `多域特征 17 维 → MLP 17-${meta.nHid}-5，训练 ${meta.nTrain} / 测试 ${meta.nTest} 样本，${meta.epochs} 轮` : '未训练')}
+      <table>${row('电弧判别模型', meta ? `实测数据（5-30.rar）双通道多域特征 ${meta.nIn} 维 → MLP ${meta.nIn}-${meta.nHid}-${meta.nOut}，训练 ${meta.nTrain} / 测试 ${meta.nTest} 窗，${meta.epochs} 轮，单窗准确率 ${(meta.acc * 100).toFixed(1)}%` : '未训练')}
         ${meta ? row('测试准确率 / 电弧检出率 / 误报率', `${(meta.acc * 100).toFixed(1)}% / ${(meta.recall * 100).toFixed(1)}% / ${(meta.far * 100).toFixed(1)}%`) : ''}
         ${row('热斑视觉流水线', '灰度化 → 高斯/Sobel/LoG 卷积特征 → 滞后阈值连通域候选 + NMS → 6 类可解释分类 + 四级分级 + 部位定位')}
         ${row('电—热融合判据 ' + FUSE.VERSION, `ΔT ${FUSE.CFG.dT1}/${FUSE.CFG.dT2}/${FUSE.CFG.dT3} K；温升 ≥${FUSE.CFG.rate} K/min；温度 ${FUSE.CFG.T1}/${FUSE.CFG.T2} ℃；电弧疑似 ${FUSE.CFG.pSus} / 确认 ${FUSE.CFG.pArc}×${FUSE.CFG.nWin} 窗`)}</table>

@@ -239,15 +239,25 @@ const Station = (() => {
     st.seg = null;
     if (S.arcSegs.length > 100) S.arcSegs.length = 100;
   }
+  const STRING_LOADS = ['阻性', '阻感', '混合', '阻性', '阻感', '混合'];
   function arcDetect(dG) {
     const C = FUSE.CFG;
     S.strings.forEach(st => {
       st.noData = !DATA.online('CT-S' + (st.idx + 1));
       if (st.I < 0.3 || st.noData) { st.pArc = 0; st.hits = 0; st.probs = null; closeSeg(st); return; }
       const arcM = S.modules.find(m => m.r === st.idx && m.fault && m.fault.type === 'arc' && !m.burnt && m.fire <= 0);
-      const type = arcM ? 'series' : S.env.inv ? 'inverter' : dG > 30 ? 'irradiance' : 'normal';
-      const g = DSP.generate(type, { I0: st.I, sev: arcM ? arcM.fault.sev : 0.5, noise: 1, onset: 0 });
-      const r = Arc.classify(g.x);
+      if (!REAL.ready) { st.probs = null; return; }
+      // 组串电流信号取自实测记录回放：各组串对应一种实验负载；电弧故障 → 同负载直流侧电弧记录；
+      // 逆变器噪声干扰 → 电子开关类负载无弧记录；辐照突变 → 随机负载无弧记录
+      // 每个仿真秒取 5 个连续窗（51.2 ms）逐窗判别后取平均概率
+      const load = STRING_LOADS[st.idx % STRING_LOADS.length];
+      const ws = REAL.run(arcM ? x => x.load === load && x.side === 'dc'
+        : S.env.inv ? x => x.load === '电子开关类' && x.side === 'none'
+          : dG > 30 ? x => x.side === 'none'
+            : x => x.load === load && x.side === 'none', 5);
+      const g = ws[0], gr = REAL.rec(g.ri);
+      const rs = ws.map(w => Arc.classify(w));
+      const r = { ready: rs[0].ready, probs: rs[0].probs.map((_, k) => rs.reduce((a, x) => a + x.probs[k], 0) / rs.length), f: rs[0].f.map((_, k) => rs.reduce((a, x) => a + x.f[k], 0) / rs.length) };
       if (!r.ready) { st.probs = null; return; }
       st.probs = r.probs; st.cls = r.probs.indexOf(Math.max(...r.probs));
       const pa = Arc.arcProb(r.probs);
@@ -257,7 +267,7 @@ const Station = (() => {
       if (pa >= C.pSus) st.locate = hot ? hot.id : null;                    // 电—热融合定位：回路内温度最高的组件
       else if (!st.arc) st.locate = null;
       if (pa >= C.pSus) {
-        if (!st.seg) { st.seg = { id: st.id, r: st.idx, loop: DATA.loopPath(st.idx), start: S.t, end: null, peak: pa, confirmed: false, locate: st.locate, cls: DSP.CLASS_NAMES[st.cls], evidence: Arc.evidence(r.f) }; S.arcSegs.unshift(st.seg); }
+        if (!st.seg) { st.seg = { id: st.id, r: st.idx, loop: DATA.loopPath(st.idx), start: S.t, end: null, peak: pa, confirmed: false, locate: st.locate, cls: DSP.CLASS_NAMES[st.cls], evidence: Arc.evidence(r.f), src: `${gr.id} ${gr.load}·${REAL.SIDE_NAMES[gr.side]} t=${g.t.toFixed(2)} s` }; S.arcSegs.unshift(st.seg); }
         else if (pa >= st.seg.peak) { st.seg.peak = pa; st.seg.evidence = Arc.evidence(r.f); st.seg.cls = DSP.CLASS_NAMES[st.cls]; st.seg.locate = st.locate; }
       } else closeSeg(st);
       st.hits = pa > C.pArc ? st.hits + 1 : 0;
