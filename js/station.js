@@ -472,7 +472,8 @@ const Station = (() => {
     const env = S.env, P = power();
     const nAct = S.modules.filter(m => !m.burnt && m.fire <= 0 && S.strings[m.r].I > 0).length;
     U.$('#k-power').innerHTML = `${P.toFixed(2)}<small>kW</small>`;
-    U.$('#k-power-s').textContent = `${nAct}/72 组件在网 · G ${env.G} W/m² · Ta ${env.Ta} ℃`;
+    U.$('#k-power-s').textContent = `在网 ${nAct}/72 · ${env.G} W/m² · ${env.Ta} ℃`;
+    U.$('#k-power-s').title = `${nAct}/72 组件在网 · 辐照 G ${env.G} W/m² · 气温 Ta ${env.Ta} ℃`;
     const live = S.modules.filter(m => !m.burnt);
     const hot = live.reduce((a, m) => (!a || m.Tm > a.Tm) ? m : a, null);
     U.$('#k-tmax').innerHTML = hot ? `${hot.Tm.toFixed(1)}<small>℃</small>` : '—';
@@ -481,7 +482,8 @@ const Station = (() => {
     const fires = S.modules.filter(m => m.fire > 0).length;
     const open = S.events.filter(isOpen).length;
     U.$('#k-alarms').innerHTML = `${al}${fires ? `<small style="color:#ef4444">起火 ${fires}</small>` : ''}`;
-    U.$('#k-alarms-s').textContent = `未关闭事件 ${open} 起 · 已抑制伪热斑 ${S.stats.suppressed} 次`;
+    U.$('#k-alarms-s').textContent = `未关闭 ${open} 起 · 伪热斑抑制 ${S.stats.suppressed}`;
+    U.$('#k-alarms-s').title = `未关闭事件 ${open} 起 · 已抑制伪热斑 ${S.stats.suppressed} 次`;
     const L = S.lvMax >= 0 ? U.LEVELS[S.lvMax] : null;
     U.$('#k-risk').innerHTML = L ? `<span style="color:${L.color}">${L.grade}</span><small>${FUSE.PRIO[S.lvMax].p}</small>` : '<span style="color:#22c55e">正常</span>';
     U.$('#k-risk-s').textContent = `参考风险指数 ${S.risk.toFixed(0)} / 100`;
