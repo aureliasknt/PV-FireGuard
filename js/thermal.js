@@ -8,9 +8,9 @@ const TH = (() => {
     shading: { name: '遮挡热斑', A: 0.05, glat: 1.2, encl: 1, P: (s, I) => s * 11.4 * I, desc: '被遮挡电池片反偏，承受子串电压耗散' },
     soiling: { name: '积灰污损', A: 0.12, glat: 1.0, encl: 1, P: (s, I) => s * 4 * I, desc: '下边框积灰造成局部遮挡' },
     crack: { name: '电池隐裂', A: 0.03, glat: 0.8, encl: 1, P: (s, I) => s * 2.5 * I, desc: '隐裂区域电流集中、局部失配' },
-    junction: { name: '接线盒/接点过热', A: 0.012, glat: 0.4, encl: 0.35, P: (s, I) => I * I * (0.05 + 0.9 * s), desc: '焊点虚接/接触电阻增大，I²R 发热' },
+    junction: { name: '接线盒/连接器过热', A: 0.012, glat: 0.4, encl: 0.35, P: (s, I) => I * I * (0.05 + 0.9 * s), desc: '焊点虚接/接触电阻增大，I²R 发热' },
     bypass: { name: '旁路二极管失效', A: 0.04, glat: 1.0, encl: 1, P: (s, I) => s * 25 * I, desc: '二极管开路，遮挡电池承受高反偏功率' },
-    arc: { name: '直流串联电弧', A: 0.003, glat: 0.25, encl: 0.5, C: 15, P: (s, I) => I * (15 + 15 * s), desc: '连接器松动拉弧，弧压约 15–30 V' },
+    arc: { name: '连接器串联电弧', A: 0.003, glat: 0.25, encl: 0.5, C: 15, P: (s, I) => I * (15 + 15 * s), desc: '连接器松动拉弧，弧压约 15–30 V' },
     reflect: { name: '反光干扰(非故障)', A: 0.05, glat: 1, encl: 1, P: () => 0, desc: '太阳/天空反射导致的伪热斑' }
   };
   const THRESHOLDS = [
