@@ -8,28 +8,147 @@ const Arc = (() => {
 
   /* ---------- 数据集与预处理说明 ---------- */
   function renderDataset() {
-    const P = REAL.P, S = P.stats, R = P.records;
-    const nTr = R.filter(r => r.split === 'train').length;
-    const totSamples = R.reduce((a, r) => a + r.samples, 0);
+    if (!REAL.hasData) return;
+    const P = REAL.P, R = REAL.records, IM = REAL.imported, EX = R.filter(r => r.src === 'builtin');
+    const nTr = R.filter(r => r.split === 'train').length, nTe = R.filter(r => r.split === 'test').length;
+    const sum = k => R.reduce((a, r) => a + (r[k] || 0), 0);
+    const dur = sum('dur');
+    const src = [EX.length ? `示例 ${EX.length} 条（5-30.rar 内置）` : '', IM.length ? `手动导入 ${IM.length} 条` : ''].filter(Boolean).join(' + ');
+    U.$('#arc-ds-sub').textContent = src;
     const steps = [
-      ['① 原始数据', `${S.files} 个 CSV · DAQ ${P.fs / 1000} kHz × 2 通道（通道0 交流侧，通道1 直流侧）`, `${(S.rawBytes / 1e9).toFixed(2)} GB · ${(totSamples / 1e6).toFixed(1)} M 点/通道`],
-      ['② 表头与标签', 'GBK 表头校验采样率/通道数；文件名 → 负载类型、电弧位置、序号', `${REAL.LOADS.length} 类负载 × 3 种工况`],
-      ['③ 量化还原', `按 ADC 步长 ${(P.lsb * 1000).toFixed(2)} mV 转为 int16 码值`, `最大误差 ${S.maxQuantErrLsb} LSB（近似无损）`],
-      ['④ 分窗', `${P.N} 点 = ${(P.N / P.fs * 1000).toFixed(2)} ms，与在线诊断窗长一致`, `${S.rawWindows.toLocaleString()} 窗`],
-      ['⑤ 清洗', '剔除无电流窗口（交流侧 σ < 20 mV，负载断开/停机段）', `剔除 ${S.invalidWindows} 窗`],
-      ['⑥ 抽样', `每记录在 12.5/37.5/62.5/87.5% 处各取 ${P.wpb} 个连续窗`, `${S.keptWindows.toLocaleString()} 窗（${P.blocks}×${P.wpb}/记录）`],
-      ['⑦ 打包', '一阶差分 + gzip + base64，浏览器端解压', `${(S.packBytes / 1e6).toFixed(2)} MB（gzip 后；内嵌文件 ≈${(S.packBytes * 4 / 3 / 1e6).toFixed(1)} MB）`],
-      ['⑧ 划分', '按记录：序号 1 → 训练集，序号 ≥2 → 测试集', `训练 ${nTr} / 测试 ${R.length - nTr} 条记录`]
+      ['① 数据来源', `DAQ ${P.fs / 1000} kHz × 2 通道（交流侧、直流侧电流）：${src}`, `${R.length} 条 · ${dur >= 60 ? (dur / 60).toFixed(1) + ' min' : dur.toFixed(1) + ' s'} · ${(sum('samples') / 1e6).toFixed(1)} M 点/通道`],
+      ['② 表头与标签', '表头（GBK/UTF-8）校验采样率/通道；文件名 → 负载类型、电弧位置、序号；可手动修改', `${REAL.LOADS.length} 类负载 · ${R.filter(r => r.side === 'unknown').length} 条未标注`],
+      ['③ 数值格式', EX.length ? `示例数据按 ADC 步长 ${(P.lsb * 1000).toFixed(2)} mV 存为 int16（误差 ${P.stats.maxQuantErrLsb} LSB）；导入数据保留 Float32 原值` : '导入数据保留 Float32 原值', '近似无损'],
+      ['④ 分窗', `${P.N} 点 = ${(P.N / P.fs * 1000).toFixed(2)} ms，与在线诊断窗长一致`, `${sum('windows').toLocaleString()} 窗`],
+      ['⑤ 清洗', '剔除无电流窗口（交流侧 σ < 20 mV，负载断开/停机段）', `剔除 ${sum('invalid').toLocaleString()} 窗`],
+      ['⑥ 抽样', `每记录在 12.5/37.5/62.5/87.5% 处各取 ${P.wpb} 个连续窗`, `${(R.length * REAL.WPR).toLocaleString()} 窗（${P.blocks}×${P.wpb}/记录）`],
+      ['⑦ 存储', '示例：差分+gzip 内嵌于 data/arc-real.js；导入：浏览器 IndexedDB（原始 CSV 不保存）', `${EX.length ? `示例 ${(P.stats.packBytes / 1e6).toFixed(2)} MB` : ''}${EX.length && IM.length ? ' · ' : ''}${IM.length ? `导入 ${(IM.length * REAL.WPR * 2 * P.N * 4 / 1e6).toFixed(1)} MB` : ''}`],
+      ['⑧ 划分', '按记录：序号 1 → 训练集，序号 ≥2 → 测试集；未标注记录只诊断不训练', `训练 ${nTr} / 测试 ${nTe} / 共 ${R.length} 条记录`]
     ];
     U.$('#arc-ds-steps').innerHTML = steps.map(r => `<tr><td style="white-space:nowrap"><b>${r[0]}</b></td><td style="font-size:12px">${r[1]}</td><td class="muted" style="font-size:12px">${r[2]}</td></tr>`).join('');
-    const cur = st.cur ? st.cur.ri : +U.$('#arc-rec').value;
-    U.$('#arc-ds-mat').innerHTML = REAL.LOADS.map(L => `<tr><td><b>${L}</b></td>${['none', 'dc', 'ac'].map(sd => `<td>${R.map((r, i) => [r, i]).filter(([r]) => r.load === L && r.side === sd)
-      .map(([r, i]) => `<span class="rchip ${r.split === 'train' ? 'train' : ''} ${i === cur ? 'on' : ''}" data-ri="${i}" title="${r.file}">${r.id} · ${Math.round(r.dur)} s</span>`).join('') || '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('');
+    const cur = +U.$('#arc-rec').value;
+    const sides = ['none', 'dc', 'ac'].concat(R.some(r => r.side === 'unknown') ? ['unknown'] : []);
+    U.$('#arc-ds-mat-h').innerHTML = `<th>负载类型</th>${sides.map(sd => `<th>${REAL.SIDE_NAMES[sd]}</th>`).join('')}`;
+    U.$('#arc-ds-mat').innerHTML = REAL.LOADS.map(L => `<tr><td><b>${L}</b></td>${sides.map(sd => `<td>${R.map((r, i) => [r, i]).filter(([r]) => r.load === L && r.side === sd)
+      .map(([r, i]) => `<span class="rchip ${r.split === 'train' ? 'train' : ''} ${r.src === 'import' ? 'imp' : ''} ${i === cur ? 'on' : ''}" data-ri="${i}" title="${r.file}${r.src === 'import' ? '（导入）' : ''}">${r.id} · ${Math.round(r.dur)} s</span>`).join('') || '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('');
     U.$$('#arc-ds-mat .rchip').forEach(el => el.onclick = () => { U.$('#arc-rec').value = el.dataset.ri; onRecChange(); });
+  }
+
+  /* 记录下拉框：按负载分组；重建时按记录编号保持当前选择 */
+  function buildSelect(keepId) {
+    const sel = U.$('#arc-rec');
+    sel.innerHTML = '';
+    REAL.LOADS.forEach(L => {
+      const g = document.createElement('optgroup'); g.label = L === '未知' ? '未知负载' : L + '负载';
+      REAL.records.forEach((r, i) => { if (r.load === L) g.insertAdjacentHTML('beforeend', `<option value="${i}">${r.id} ${REAL.SIDE_NAMES[r.side]} #${r.seq}（${REAL.SPLIT_NAMES[r.split]}${r.src === 'import' ? '·导入' : ''}）</option>`); });
+      sel.appendChild(g);
+    });
+    const k = keepId ? REAL.indexOf(keepId) : -1;
+    sel.value = k >= 0 ? k : Math.max(0, REAL.records.findIndex(r => r.side === 'dc' && r.split === 'test'));
+  }
+
+  /* ---------- 手动导入 ---------- */
+  async function handleFiles(list) {
+    const files = [...list].filter(f => /\.(csv|txt|rar|zip|7z)$/i.test(f.name));
+    if (!files.length) { U.toast('未找到 CSV 文件', 'warn'); return; }
+    if (!DATA.guard('model')) return;
+    const box = U.$('#arc-imp-prog');
+    box.innerHTML = files.map((f, k) => `<div class="ip" id="ip-${k}"><span class="nm" title="${f.name}">${f.name}</span><div class="bar"><i style="width:0%"></i></div><span class="msg">等待中 · ${(f.size / 1e6).toFixed(1)} MB</span></div>`).join('');
+    const opts = { fsDefault: +U.$('#arc-imp-fs').value, map: U.$('#arc-imp-map').value };
+    let ok = 0;
+    for (let k = 0; k < files.length; k++) {
+      const f = files[k], row = U.$('#ip-' + k), bar = row.querySelector('i'), msg = row.querySelector('.msg');
+      msg.textContent = '解析中…';
+      try {
+        const r = await ArcImport.importFile(f, opts, p => { bar.style.width = (p * 90).toFixed(0) + '%'; msg.textContent = `解析中 ${(p * 100).toFixed(0)}%`; });
+        const saved = await REAL.ingest(r);
+        bar.style.width = '100%'; ok++;
+        msg.textContent = `✓ ${saved.id} · ${saved.load} · ${REAL.SIDE_NAMES[saved.side]} #${saved.seq} · ${saved.dur} s · ${saved.windows} 窗（剔除 ${saved.invalid}）· ${saved.chMap} · ${(saved.parseMs / 1000).toFixed(1)} s`;
+        DATA.audit('导入实测数据', `${f.name} → ${saved.id}（${saved.load}，${REAL.SIDE_NAMES[saved.side]}，${saved.dur} s）`);
+      } catch (e) {
+        row.classList.add('err'); bar.style.width = '100%'; bar.style.background = 'var(--red)';
+        msg.textContent = '✗ ' + (e.message || e);
+      }
+    }
+    U.toast(`导入完成：成功 ${ok} / ${files.length} 个文件`, ok === files.length ? 'ok' : 'warn');
+    if (ok && U.$('#arc-imp-train').checked) train();
+  }
+
+  function renderImports() {
+    const IM = REAL.imported;
+    U.$('#arc-imp-sub').textContent = IM.length ? `${IM.length} 条 · 共 ${(IM.reduce((a, r) => a + r.rawBytes, 0) / 1e6).toFixed(0)} MB 原始数据` : '';
+    const opt = (o, v) => Object.entries(o).map(([k, n]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${n}</option>`).join('');
+    const loads = [...new Set(['阻性', '感性', '阻感', '电子开关类', '混合', '未知'].concat(IM.map(r => r.load)))];
+    U.$('#arc-imp-list').innerHTML = IM.map(r => `<tr>
+      <td><b>${r.id}</b></td><td style="font-size:12px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.file}">${r.file}</td>
+      <td><select class="imp-sel" data-id="${r.id}" data-k="load">${loads.map(l => `<option ${l === r.load ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      <td><select class="imp-sel" data-id="${r.id}" data-k="side">${opt(REAL.SIDE_NAMES, r.side)}</select></td>
+      <td><select class="imp-sel" data-id="${r.id}" data-k="split">${opt(REAL.SPLIT_NAMES, r.split)}</select></td>
+      <td class="muted" style="font-size:12px;white-space:nowrap">${r.dur} s · ${r.windows}</td>
+      <td><button class="btn sm" data-del="${r.id}">删除</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">暂无导入数据。可导入解压后的 5-30 文件夹中的 CSV。</td></tr>';
+    U.$$('#arc-imp-list .imp-sel').forEach(el => el.onchange = () => {
+      if (!DATA.guard('model')) { renderImports(); return; }
+      const patch = { [el.dataset.k]: el.value };
+      if (el.dataset.k === 'side' && el.value === 'unknown') patch.split = 'none';
+      REAL.update(el.dataset.id, patch);
+      DATA.audit('修改导入数据标注', `${el.dataset.id}：${el.dataset.k} → ${el.value}`);
+      U.$('#arc-train-info').innerHTML = '<span style="color:#f97316">数据集标注已变更，请点击“重新训练”使模型生效。</span>';
+    });
+    U.$$('#arc-imp-list [data-del]').forEach(el => el.onclick = () => {
+      if (!DATA.guard('model')) return;
+      REAL.remove(el.dataset.del); DATA.audit('删除导入数据', el.dataset.del);
+      U.$('#arc-train-info').innerHTML = '<span style="color:#f97316">数据集已变更，请点击“重新训练”使模型生效。</span>';
+    });
+  }
+
+  /* 数据集变更（导入/修改/删除）后刷新页面各部分 */
+  function onDataChange() {
+    const keep = st.cur ? st.cur.id : null;
+    st.feats = null;
+    buildSelect(keep);
+    U.$('#arc-example').textContent = REAL.example ? '移除示例数据' : '加载示例数据';
+    renderDataset(); renderImports(); updWinLabel(); drawOverview();
+    if (!REAL.hasData) {
+      st.cur = null; st.stream = null; st.ready = false; st.evalM = st.deploy = null; st.meta = null; st.eval = null; st.imp = null; st.hist = { loss: [], acc: [] };
+      U.$('#arc-train-info').textContent = '等待数据接入：导入 CSV 或加载示例数据后自动训练。';
+      return;
+    }
+    if (!st.ready) { train(); return; }   // 首次有数据：自动训练
+    if (Main.current() === 'arc') diagnose();
+  }
+
+  function initImport() {
+    const drop = U.$('#arc-drop');
+    U.$('#arc-pick').onclick = () => U.$('#arc-file').click();
+    U.$('#arc-pick-dir').onclick = () => U.$('#arc-dir').click();
+    U.$('#arc-file').onchange = e => { handleFiles(e.target.files); e.target.value = ''; };
+    U.$('#arc-dir').onchange = e => { handleFiles(e.target.files); e.target.value = ''; };
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = async e => { e.preventDefault(); drop.classList.remove('over'); handleFiles(await ArcImport.filesFromDrop(e.dataTransfer)); };
+    U.$('#arc-imp-clear').onclick = async () => {
+      if (!REAL.imported.length || !DATA.guard('model')) return;
+      if (!confirm(`确定清除全部 ${REAL.imported.length} 条导入记录？`)) return;
+      await REAL.clear(); DATA.audit('清除导入数据', '全部'); U.$('#arc-imp-prog').innerHTML = '';
+      if (U.$('#arc-imp-train').checked) train();
+    };
+    U.$('#arc-example').onclick = async () => {
+      if (!DATA.guard('model')) return;
+      const on = !REAL.example;
+      U.$('#arc-example').disabled = true;
+      await REAL.setExample(on);
+      U.$('#arc-example').disabled = false;
+      DATA.audit(on ? '加载示例数据' : '移除示例数据', '5-30.rar 内置 29 条记录');
+      if (st.ready) train();
+      U.toast(on ? '已加载示例数据（5-30 内置 29 条记录）' : '已移除示例数据', 'ok');
+    };
+    REAL.onChange(onDataChange);
+    renderImports();
   }
 
   /* 记录全时段概览：每 0.1 s 的直流均值、直流高频分量、交流有效值 */
   function drawOverview() {
+    if (!REAL.hasData) return;
     const ri = +U.$('#arc-rec').value, r = REAL.rec(ri), P = REAL.P, ov = r.ov;
     const t = ov.dcMean.map((_, i) => +(i * P.overviewDt).toFixed(2));
     const nrm = a => { const mx = Math.max(...a.map(Math.abs)) || 1; return { y: a.map(v => v / mx), mx }; };
@@ -49,22 +168,19 @@ const Arc = (() => {
   }
 
   function onRecChange() {
+    if (!REAL.hasData) return;
     renderDataset(); drawOverview(); updWinLabel();
     if (REAL.ready) diagnose();
   }
   function updWinLabel() {
+    if (!REAL.hasData) { U.$('#arc-w-v').textContent = ''; return; }
     const r = REAL.rec(+U.$('#arc-rec').value), w = +U.$('#arc-w').value, P = REAL.P, b = Math.floor(w / P.wpb);
     U.$('#arc-w-v').textContent = `#${w + 1} · 段${b + 1} · t=${((r.blocks[b] + w % P.wpb) * P.N / P.fs).toFixed(3)} s`;
   }
 
   function init() {
     const sel = U.$('#arc-rec');
-    REAL.LOADS.forEach(L => {
-      const g = document.createElement('optgroup'); g.label = L + '负载';
-      REAL.records.forEach((r, i) => { if (r.load === L) g.insertAdjacentHTML('beforeend', `<option value="${i}">${r.id} ${REAL.SIDE_NAMES[r.side]} #${r.seq}（${r.split === 'train' ? '训练' : '测试'}）</option>`); });
-      sel.appendChild(g);
-    });
-    sel.value = REAL.records.findIndex(r => r.side === 'dc' && r.split === 'test');
+    buildSelect();
     sel.onchange = onRecChange;
     U.$('#arc-w').addEventListener('input', () => { updWinLabel(); drawOverview(); });
     U.$('#arc-w').addEventListener('change', () => { if (REAL.ready) diagnose(); });
@@ -78,6 +194,7 @@ const Arc = (() => {
     };
     U.$('#arc-train').onclick = () => { if (DATA.guard('model')) { DATA.audit('电弧模型重新训练', `实测数据，${U.$('#arc-split').selectedOptions[0].text}划分，隐层 ${U.$('#arc-h').value}`); train(); } };
     U.$('#arc-stream').onclick = stream;
+    initImport();
     renderDataset(); updWinLabel();
   }
 
@@ -134,29 +251,45 @@ const Arc = (() => {
   }
 
   /* ---------- 训练：全部实测窗口提取特征 → MLP ---------- */
+  /* 只使用已标注记录；R 保存记录快照，避免训练过程中数据集变更导致错位 */
   async function extractAll(info) {
     if (st.feats) return st.feats;
     await REAL.load();
-    const X = [], Y = [], R = [];
-    for (let ri = 0; ri < REAL.records.length; ri++) {
-      for (let w = 0; w < REAL.WPR; w++) { const g = REAL.win(ri, w); X.push(DSP.features(g.dc, g.ac)); Y.push(g.cls); R.push(ri); }
-      info.textContent = `解码实测数据并提取特征：记录 ${ri + 1}/${REAL.records.length}（${X.length} 窗）…`;
+    const X = [], Y = [], R = [], recs = REAL.records.slice();
+    for (let ri = 0; ri < recs.length; ri++) {
+      if (REAL.cls(recs[ri]) == null) continue;
+      for (let w = 0; w < REAL.WPR; w++) { const g = REAL.win(REAL.indexOf(recs[ri].id), w); X.push(DSP.features(g.dc, g.ac)); Y.push(g.cls); R.push(recs[ri]); }
+      info.textContent = `读取实测数据并提取特征：记录 ${ri + 1}/${recs.length}（${X.length} 窗）…`;
       await U.sleep(0);
     }
     return (st.feats = { X, Y, R });
   }
 
   async function train() {
-    if (st.training) return;
-    st.training = true;
+    if (st.training) { st.retrain = true; return; }
+    st.training = true; st.retrain = false;
+    await REAL.load();
+    if (!REAL.records.some(r => REAL.cls(r) != null)) {
+      st.ready = false; st.evalM = st.deploy = null; st.cur = null; st.stream = null; st.training = false;
+      st.trainError = REAL.hasData ? '记录均未标注' : null;
+      U.$('#arc-train-info').textContent = REAL.hasData ? '当前记录均未标注，无法训练判别模型：请在“已导入记录”中标注（无电弧/直流侧/交流侧），或加载示例数据作为训练集。' : '等待数据接入：导入 CSV 或加载示例数据后自动训练。';
+      if (REAL.hasData) U.$('#arc-verdict').innerHTML = '<span class="muted">无可用模型：需要至少一组已标注的记录</span>';
+      return null;
+    }
     const btn = U.$('#arc-train'); btn.disabled = true;
     const info = U.$('#arc-train-info');
     const nHid = +U.$('#arc-h').value, epochs = +U.$('#arc-ep').value, split = U.$('#arc-split').value;
     const { X, Y, R } = await extractAll(info);
     let tr, te;
     if (split === 'record') {
-      tr = X.map((_, i) => i).filter(i => REAL.rec(R[i]).split === 'train');
-      te = X.map((_, i) => i).filter(i => REAL.rec(R[i]).split === 'test');
+      tr = X.map((_, i) => i).filter(i => R[i].split === 'train');
+      te = X.map((_, i) => i).filter(i => R[i].split === 'test');
+      const miss = [0, 1, 2].filter(c => !tr.some(i => Y[i] === c));
+      if (miss.length || !te.length) {
+        st.trainError = miss.length ? `训练集缺少「${miss.map(c => DSP.CLASS_NAMES[c]).join('、')}」样本` : '测试集为空';
+        info.innerHTML = `<span style="color:#ef4444">无法训练：${st.trainError}，请在“已导入记录”中调整标签或用途，或加载示例数据补充训练集。</span>`;
+        st.training = false; btn.disabled = false; return st.meta;
+      }
     } else {
       const idx = X.map((_, i) => i);
       for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
@@ -192,11 +325,12 @@ const Arc = (() => {
     let rec = null;
     if (split === 'record') {
       const C = FUSE.CFG, by = {};
-      te.forEach((i, k) => { (by[R[i]] = by[R[i]] || []).push(model.predict(Xte[k])); });
-      const rows = Object.entries(by).map(([ri, P]) => {
+      const recOf = {};
+      te.forEach((i, k) => { recOf[R[i].id] = R[i]; (by[R[i].id] = by[R[i].id] || []).push(model.predict(Xte[k])); });
+      const rows = Object.entries(by).map(([id, P]) => {
         const votes = [0, 0, 0]; P.forEach(p => votes[p.indexOf(Math.max(...p))]++);
         let h = 0, conf = false; P.forEach(p => { h = arcProb(p) >= C.pArc ? h + 1 : 0; if (h >= C.nWin) conf = true; });
-        const r = REAL.rec(+ri), y = REAL.cls(r);
+        const r = recOf[id], y = REAL.cls(r);
         return { r, y, vote: votes.indexOf(Math.max(...votes)), conf, arcFrac: (votes[1] + votes[2]) / P.length };
       });
       rec = { rows, ok: rows.filter(o => o.vote === o.y).length, n: rows.length,
@@ -209,10 +343,13 @@ const Arc = (() => {
       mA.trainEpoch(XA, Y, { lr: 0.01, batch: 32 });
       if (e % 8 === 7) { info.textContent = `使用全部 ${REAL.records.length} 条记录训练在线部署模型：第 ${e + 1}/${epochs} 轮 …`; await U.sleep(0); }
     }
-    st.deploy = { model: mA, scaler: scAll }; st.ready = true;
+    st.deploy = { model: mA, scaler: scAll }; st.ready = true; st.trainError = null;
     st.meta = { nTrain: Xtr.length, nTest: Xte.length, nIn, nHid, nOut, epochs, split, acc: st.eval.acc, recall, far, rec, time: new Date() };
-    info.innerHTML = `训练完成：实测窗口 ${X.length}（训练 ${Xtr.length} / 测试 ${Xte.length}，${split === 'record' ? '按记录划分' : '随机划分'}），网络 ${nIn}-${nHid}-${nOut}。单窗测试准确率 <b>${(st.eval.acc * 100).toFixed(1)}%</b>，电弧检出率 <b>${(recall * 100).toFixed(1)}%</b>，误报率 <b>${(far * 100).toFixed(1)}%</b>。<br>本页诊断与回放使用评估模型；在线监测使用全部记录训练的部署模型。`;
+    const nImp = new Set(R.filter(r => r.src === 'import').map(r => r.id)).size;
+    st.meta.nRec = new Set(R.map(r => r.id)).size; st.meta.nImp = nImp;
+    info.innerHTML = `训练完成：${st.meta.nRec} 条已标注记录${nImp ? `（含导入 ${nImp} 条）` : ''}，实测窗口 ${X.length}（训练 ${Xtr.length} / 测试 ${Xte.length}，${split === 'record' ? '按记录划分' : '随机划分'}），网络 ${nIn}-${nHid}-${nOut}。单窗测试准确率 <b>${(st.eval.acc * 100).toFixed(1)}%</b>，电弧检出率 <b>${(recall * 100).toFixed(1)}%</b>，误报率 <b>${(far * 100).toFixed(1)}%</b>。<br>本页诊断与回放使用评估模型；在线监测使用全部已标注记录训练的部署模型。`;
     st.training = false; btn.disabled = false;
+    if (st.retrain) { setTimeout(train, 0); return st.meta; }
     drawAll();
     diagnose();
     if (typeof Main !== 'undefined' && Main.current() === 'arc') stream();
@@ -271,11 +408,12 @@ const Arc = (() => {
 
   async function diagnose() {
     await REAL.load();
+    if (!REAL.hasData) return;
     const p = currentParams();
     const g = degrade(REAL.win(p.ri, p.w), p);
     const chk = sampleCheck(g, p.fsDev);
     const r = classify(g, 'eval');
-    st.cur = { ...p, g, probs: r.probs, f: r.f, chk };
+    st.cur = { ...p, id: REAL.rec(p.ri).id, g, probs: r.probs, f: r.f, chk };
     renderResult();
     renderDataset();
   }
@@ -304,7 +442,7 @@ const Arc = (() => {
 
   function renderProbs() {
     const c = st.cur;
-    if (!st.ready) { U.$('#arc-verdict').innerHTML = '<span class="muted">模型训练中…</span>'; U.$('#arc-probs').innerHTML = ''; U.$('#arc-evid').innerHTML = ''; return; }
+    if (!st.ready) { U.$('#arc-verdict').innerHTML = st.trainError ? `<span style="color:#fbbf24">模型不可用：${st.trainError}</span>` : '<span class="muted">模型训练中…</span>'; U.$('#arc-probs').innerHTML = ''; U.$('#arc-evid').innerHTML = ''; return; }
     if (!c.chk.ok) {
       U.$('#arc-verdict').innerHTML = `<span style="color:#fbbf24">信号不满足采样要求</span> ${U.tag('不予判别', 'orange')}`;
       U.$('#arc-probs').innerHTML = `<div class="hint">未通过项：${c.chk.items.filter(i => !i[3]).map(i => i[0]).join('、')}。为避免误判，仅对满足采样要求的电气信号进行电弧诊断，请检查采集设备。</div>`;
@@ -318,17 +456,20 @@ const Arc = (() => {
     U.$('#arc-evid').innerHTML = `<div class="muted" style="font-size:12px;margin:8px 0 4px">诊断证据（相对正常工况分布偏离最大的特征）</div>` +
       evidence(c.f, 4).map(e => `<div class="pr"><span>${e.name}<span class="muted">·${e.dom}</span></span><div class="bar"><i style="width:${Math.min(100, Math.abs(e.z) * 8).toFixed(0)}%;background:${e.z > 0 ? '#f97316' : '#38bdf8'}"></i></div><span style="text-align:right">${e.z >= 0 ? '+' : ''}${e.z.toFixed(1)}σ</span></div>`).join('');
     U.$('#arc-probs').innerHTML = c.probs.map((p, i) => `<div class="pr"><span>${DSP.CLASS_NAMES[i]}</span><div class="bar"><i style="width:${(p * 100).toFixed(1)}%;background:${DSP.CLASS_COLORS[i]}"></i></div><span style="text-align:right">${(p * 100).toFixed(1)}%</span></div>`).join('') +
-      `<div class="hint" style="margin-top:6px">实测标签：${DSP.CLASS_NAMES[y]}（${rec.split === 'train' ? '训练集' : '测试集'}记录）${best === y ? ' ' + U.tag('判别正确', 'ok') : ' ' + U.tag('判别错误', 'red')}</div>`;
+      (y == null
+        ? `<div class="hint" style="margin-top:6px">记录未标注（${rec.src === 'import' ? '导入数据' : ''}），仅给出诊断结论；在“已导入记录”中标注后可参与训练与评估。</div>`
+        : `<div class="hint" style="margin-top:6px">实测标签：${DSP.CLASS_NAMES[y]}（${REAL.SPLIT_NAMES[rec.split]}记录${rec.src === 'import' ? '·导入' : ''}）${best === y ? ' ' + U.tag('判别正确', 'ok') : ' ' + U.tag('判别错误', 'red')}</div>`);
   }
 
   /* ---------- 实时检测回放：同一负载的无弧记录 2 段 → 电弧记录 3 段 ---------- */
   async function stream() {
+    if (!REAL.hasData) return;
     if (!st.ready) { U.toast('模型尚未训练完成，请稍候', 'warn'); return; }
     await REAL.load();
     const R = REAL.records, ri = +U.$('#arc-rec').value, r = R[ri];
     const prefer = list => list.find(i => R[i].split === 'test') ?? list[0];
     const idxOf = f => R.map((x, i) => i).filter(i => f(R[i]));
-    const arcI = r.side !== 'none' ? ri : prefer(idxOf(x => x.load === r.load && x.side === 'dc'));
+    const arcI = r.side !== 'none' ? ri : prefer(idxOf(x => x.load === r.load && x.side === 'dc')) ?? prefer(idxOf(x => x.side === 'dc'));
     let normI = prefer(idxOf(x => x.load === R[arcI].load && x.side === 'none')), note = '';
     if (normI == null) { normI = prefer(idxOf(x => x.load === '阻感' && x.side === 'none')); note = `（${R[arcI].load}负载无无弧记录，前段借用阻感负载）`; }
     const P = REAL.P, C = FUSE.CFG, winMs = P.N / P.fs * 1000;
@@ -349,7 +490,7 @@ const Arc = (() => {
     drawStream();
     U.$('#arc-stream-res').innerHTML = `
       <div class="k">前段（无电弧）</div><div class="v">${R[normI].id} ${R[normI].load} #${R[normI].seq} · 段1–2${note}</div>
-      <div class="k">后段（电弧）</div><div class="v">${R[arcI].id} ${R[arcI].load} · ${REAL.SIDE_NAMES[R[arcI].side]} #${R[arcI].seq} · 段2–4</div>
+      <div class="k">后段（${R[arcI].side === 'unknown' ? '待诊断记录' : '电弧'}）</div><div class="v">${R[arcI].id} ${R[arcI].load} · ${REAL.SIDE_NAMES[R[arcI].side]} #${R[arcI].seq} · 段2–4</div>
       <div class="k">拼接点（电弧出现）</div><div class="v">${tOn.toFixed(1)} ms</div>
       <div class="k">确认检出时刻（P≥${C.pArc}×${C.nWin} 窗）</div><div class="v">${tDet != null ? tDet.toFixed(1) + ' ms' : '未检出'}</div>
       <div class="k">检测延时</div><div class="v"><b>${delay != null ? delay.toFixed(1) + ' ms' : '—'}</b></div>
@@ -393,7 +534,7 @@ const Arc = (() => {
   }
 
   function drawAll() { drawCurve(); drawCM(); drawImp(); drawStream(); if (st.cur) renderResult(); else drawOverview(); }
-  function onShow() { if (!st.cur && st.ready) diagnose(); if (!st.stream && st.ready) stream(); drawAll(); renderDataset(); Station.stringsPanel(); live(); }
+  function onShow() { if (!REAL.hasData) { renderImports(); return; } if (!st.cur && st.ready) diagnose(); if (!st.stream && st.ready) stream(); drawAll(); renderDataset(); Station.stringsPanel(); live(); }
 
   return { init, train, classify, arcProb, evidence, live, onShow, get ready() { return st.ready; }, get meta() { return st.meta; }, get state() { return st; } };
 })();

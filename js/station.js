@@ -24,6 +24,7 @@ const Station = (() => {
     S.btab = S.btab || 'dev';
     S.t = 0; S.log = []; S.frames = []; S.events = []; S.evSeq = 0; S.arcSegs = []; S.sel = null;
     S.stats = { blocked: 0, ignitions: 0, leads: [], suppressed: 0 };
+    S.risk = 0; S.lvMax = -1;
   }
   const mod = (r, c) => (r >= 0 && r < ROWS && c >= 0 && c < COLS) ? S.modules[r * COLS + c] : null;
 
@@ -254,7 +255,9 @@ const Station = (() => {
       const ws = REAL.run(arcM ? x => x.load === load && x.side === 'dc'
         : S.env.inv ? x => x.load === '电子开关类' && x.side === 'none'
           : dG > 30 ? x => x.side === 'none'
-            : x => x.load === load && x.side === 'none', 5);
+            : x => x.load === load && x.side === 'none', 5)
+        || REAL.run(arcM ? x => x.side === 'dc' : x => x.side === 'none', 5);   // 该负载无对应记录时退回任意同类记录
+      if (!ws) { st.probs = null; return; }
       const g = ws[0], gr = REAL.rec(g.ri);
       const rs = ws.map(w => Arc.classify(w));
       const r = { ready: rs[0].ready, probs: rs[0].probs.map((_, k) => rs.reduce((a, x) => a + x.probs[k], 0) / rs.length), f: rs[0].f.map((_, k) => rs.reduce((a, x) => a + x.f[k], 0) / rs.length) };
@@ -393,6 +396,16 @@ const Station = (() => {
 
   /* ---------- 绘制 ---------- */
   function header() {
+    const st = U.$('#hd-state');
+    if (!S.started) {
+      U.$('#hd-clock').textContent = '—';
+      U.$('#hd-risk').innerHTML = '<span class="muted">等待数据</span>';
+      if (st) st.textContent = '等待数据';
+      U.$('#hd-pulse').style.background = '#64748b';
+      return;
+    }
+    if (st) st.textContent = S.running ? '运行中' : '已暂停';
+    U.$('#hd-pulse').style.background = S.running ? '' : '#64748b';
     U.$('#hd-clock').textContent = clock();
     const L = S.lvMax >= 0 ? U.LEVELS[S.lvMax] : null;
     U.$('#hd-risk').innerHTML = L ? `<span style="color:${L.color}">${L.grade}预警 · ${S.risk.toFixed(0)}</span>` : '<span style="color:#22c55e">正常</span>';
@@ -527,7 +540,7 @@ const Station = (() => {
     el.innerHTML = S.strings.map(st => {
       const pa = st.pArc || 0;
       const status = st.noData ? U.tag('采样不满足', 'orange') : st.shutdown ? U.tag('已关断', 'action') : st.arc ? U.tag('电弧确认', 'red') : pa >= FUSE.CFG.pSus ? U.tag('疑似电弧', 'orange') : st.I === 0 ? U.tag('停运', 'info') : U.tag('正常', 'ok');
-      const cls = st.noData ? `<span style="color:#fbbf24">CT-S${st.idx + 1} 离线，暂停判别</span>` : st.probs ? `<span style="color:${DSP.CLASS_COLORS[st.cls]}">${DSP.CLASS_NAMES[st.cls]}</span>` : (Arc.ready ? '—' : '<span class="muted">模型训练中</span>');
+      const cls = st.noData ? `<span style="color:#fbbf24">CT-S${st.idx + 1} 离线，暂停判别</span>` : st.probs ? `<span style="color:${DSP.CLASS_COLORS[st.cls]}">${DSP.CLASS_NAMES[st.cls]}</span>` : (Arc.ready ? '—' : Arc.state.trainError ? `<span style="color:#fbbf24">模型不可用：${Arc.state.trainError}</span>` : '<span class="muted">模型训练中</span>');
       const btn = st.shutdown ? `<button class="btn sm" data-restore="${st.idx}">恢复送电</button>` : '';
       return `<div class="srow"><b>${st.id}</b><span>${st.I.toFixed(2)} A</span><div><div class="mini-bar"><i style="width:${(pa * 100).toFixed(0)}%;background:${pa > 0.6 ? '#ef4444' : pa > 0.3 ? '#f97316' : '#22c55e'}"></i></div><div class="muted" style="font-size:12px;margin-top:2px">${DATA.loopPath(st.idx)} · P(电弧) ${(pa * 100).toFixed(1)}% · ${cls}</div></div><span>${status}</span><span>${btn}</span></div>`;
     }).join('');
@@ -658,7 +671,7 @@ const Station = (() => {
     U.$$('#st-view button').forEach(b => b.onclick = () => { U.$$('#st-view button').forEach(x => x.classList.toggle('on', x === b)); S.view = b.dataset.v; render(); });
     U.$$('#st-speed button').forEach(b => b.onclick = () => { U.$$('#st-speed button').forEach(x => x.classList.toggle('on', x === b)); S.speed = +b.dataset.s; });
     U.$$('#st-win button').forEach(b => b.onclick = () => { U.$$('#st-win button').forEach(x => x.classList.toggle('on', x === b)); S.trendWin = +b.dataset.w; trend(); });
-    U.$('#st-play').onclick = () => { S.running = !S.running; U.$('#st-play').textContent = S.running ? '暂停' : '继续'; U.$('#hd-pulse').style.background = S.running ? '' : '#64748b'; };
+    U.$('#st-play').onclick = () => { S.running = !S.running; U.$('#st-play').textContent = S.running ? '暂停' : '继续'; header(); };
     U.$('#st-load').onclick = () => { const k = U.$('#st-scenario').value; if (!k) { U.toast('请先选择一个场景', 'warn'); return; } loadScenario(k); };
     U.$('#st-auto').onchange = e => { S.auto = e.target.checked; log('电站', S.auto ? '启用自动联动处置' : '关闭自动联动处置', 'info', null, S.auto ? '红色预警/电弧确认时自动快速关断组串' : '仅告警，不自动关断'); DATA.audit('联动处置开关', S.auto ? '启用' : '关闭'); };
     U.$('#st-reset').onclick = () => reset();
@@ -675,15 +688,43 @@ const Station = (() => {
       DATA.audit('导出告警日志', `${S.log.length} 条`);
     };
     U.$('#st-clearlog').onclick = () => { S.log = []; S.logDirty = true; render(); };
-    log('电站', '系统启动', 'info', null, `${DATA.SOURCES.length} 个测点接入，红外通道与电弧通道自检通过`);
     DATA.audit('系统启动', '加载设备映射与预警判据 ' + FUSE.VERSION);
-    for (let i = 0; i < 30; i++) step();
+    // 数据入口按钮（电站页与电弧诊断页的空状态卡片）
+    document.addEventListener('click', async e => {
+      if (e.target.closest('[data-goto-import]')) { Main.go('arc'); setTimeout(() => U.$('#arc-drop').scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }
+      if (e.target.closest('[data-load-example]')) {
+        if (!DATA.guard('model')) return;
+        U.toast('正在加载示例数据（5-30 内置 29 条记录）…');
+        await REAL.setExample(true);
+        DATA.audit('加载示例数据', '5-30.rar 内置 29 条记录');
+        if (Arc.ready) Arc.train();
+      }
+    });
+    REAL.onChange(syncData);
+    syncData();
     setInterval(tick, 1000);
     setInterval(() => { if (Main.current() === 'station') { const s = U.setup(U.$('#st-canvas')); if (s) drawArray(s); } }, 250);
   }
 
+  /* 有数据才运行：首次有数据时启动电站仿真，数据被全部移除时回到等待状态 */
+  function syncData() {
+    const on = REAL.hasData;
+    U.$('#page-station').classList.toggle('nodata', !on);
+    U.$('#page-arc').classList.toggle('nodata', !on);
+    if (on && !S.started) {
+      build(); S.started = true;
+      const nImp = REAL.imported.length, nEx = REAL.records.length - nImp;
+      log('电站', '数据接入，开始监测', 'info', null, `${REAL.records.length} 条实测记录（${nEx ? `示例 ${nEx} 条` : ''}${nEx && nImp ? '，' : ''}${nImp ? `导入 ${nImp} 条` : ''}）；${DATA.SOURCES.length} 个测点接入`);
+      for (let i = 0; i < 30; i++) step();
+    } else if (!on && S.started) {
+      build(); S.started = false;
+    }
+    S.evDirty = true; S.logDirty = true;
+    if (Main.current() === 'station') render(); else header();
+  }
+
   function tick() {
-    if (S.running) for (let k = 0; k < S.speed; k++) step();
+    if (S.running && S.started) for (let k = 0; k < S.speed; k++) step();
     const p = Main.current();
     if (p === 'station') render(); else header();
     if (p === 'arc') { stringsPanel(); Arc.live(); }

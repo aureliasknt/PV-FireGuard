@@ -12,7 +12,7 @@
   <div class="logo">PV</div>
   <div class="brand"><b>光伏卫士 PV-FireGuard</b><small>v1.1</small></div>
   <div class="spacer"></div>
-  <div class="stat hide-sm"><span class="muted">状态</span><br><b><span class="pulse" id="hd-pulse"></span>运行中</b></div>
+  <div class="stat hide-sm"><span class="muted">状态</span><br><b><span class="pulse" id="hd-pulse"></span><span id="hd-state">运行中</span></b></div>
   <div class="stat hide-sm"><span class="muted">用户</span><br><b id="hd-user">—</b></div>
   <div class="stat"><span class="muted">时钟</span><br><b id="hd-clock">11:00:00</b></div>
   <div class="stat"><span class="muted">预警</span><br><b id="hd-risk">—</b></div>
@@ -35,7 +35,14 @@
   <main>
   <!-- ================= ① 电站可视化与状态监测 ================= -->
   <section class="page active" id="page-station">
-    <div class="page-title st-title"><h2>电站状态监测</h2><p>28.8 kWp · 6 组串 × 12 块</p></div>
+    <div class="page-title st-title"><h2>电站状态监测</h2><p>28.8 kWp · 6 组串 × 12 块 · 电流信号=实测数据，温度/红外/功率=<span class="sim-tag">仿真</span></p></div>
+    <div class="card empty-state" id="st-empty">
+      <div class="es-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h6"/><circle cx="18" cy="16" r="3"/></svg></div>
+      <h3>等待数据接入</h3>
+      <p>平台当前没有任何实测数据，因此不显示监测结果。导入数据后，组串电流信号将从导入的记录回放并进行电弧诊断，电站仿真随即启动。</p>
+      <div class="row" style="justify-content:center"><button class="btn primary" data-goto-import>前往导入数据</button><button class="btn" data-load-example>加载示例数据（5-30 内置 29 条）</button></div>
+      <p class="hint">接入方式：手动导入 DAQ 导出的 CSV（如解压后的 5-30.rar）。实时采集接入后将通过同一接口自动写入。</p>
+    </div>
     <div class="grid kpis compact">
       <div class="card kpi"><div class="l">实时发电功率</div><div class="v" id="k-power">—</div><div class="s" id="k-power-s">—</div></div>
       <div class="card kpi"><div class="l">组件最高温度</div><div class="v" id="k-tmax">—</div><div class="s" id="k-tmax-s">—</div></div>
@@ -126,7 +133,7 @@
   </section>
   <!-- ================= ② 热异常与热斑诊断 ================= -->
   <section class="page" id="page-hotspot">
-    <div class="page-title"><h2>热异常诊断</h2><p>组件 · 连接器 · 接线盒</p></div>
+    <div class="page-title"><h2>热异常诊断</h2><p>组件 · 连接器 · 接线盒 · <span class="sim-tag">仿真</span> 红外热像（可上传实拍图像）</p></div>
     <div class="grid side-main">
       <div class="card">
         <h3>输入与参数</h3>
@@ -179,16 +186,49 @@
   <!-- ================= ③ 电弧故障诊断（实测数据） ================= -->
   <section class="page" id="page-arc">
     <div class="page-title"><h2>电弧故障诊断</h2><p>实测数据 · 100 kHz 双通道 · 34 维特征 · 连续窗确认</p></div>
-    <div class="grid g2">
+    <div class="grid g2 need-data">
       <div class="card"><h3>组串回路实时监测 <span class="sub">信号回放自实测记录</span></h3><div class="strings" id="arc-strings"></div></div>
       <div class="card"><h3>疑似电弧事件 </h3>
         <div class="tablewrap" style="max-height:330px"><table class="t"><thead><tr><th>关联回路</th><th>异常时段</th><th>峰值P</th><th>结论</th><th>定位</th><th>诊断证据</th><th>事件</th></tr></thead><tbody id="arc-segs"></tbody></table></div></div>
     </div>
+    <div class="grid g2 keep">
+      <div class="card">
+        <h3>数据导入 <span class="sub">手动导入 DAQ 采集文件（实时接入预留同一接口）</span></h3>
+        <div class="drop" id="arc-drop">
+          <div>将 CSV 文件或整个文件夹拖到此处</div>
+          <div class="row" style="justify-content:center;margin-top:8px"><button class="btn primary sm" id="arc-pick">选择 CSV 文件</button><button class="btn sm" id="arc-pick-dir">选择文件夹</button><button class="btn sm" id="arc-example">加载示例数据</button></div>
+          <input type="file" id="arc-file" accept=".csv,.txt,.rar,.zip" multiple hidden>
+          <input type="file" id="arc-dir" webkitdirectory multiple hidden>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="muted" style="font-size:12px">通道映射</label><select id="arc-imp-map"><option value="auto" selected>按表头自动识别</option><option value="ac0">通道0=交流，通道1=直流</option><option value="dc0">通道0=直流，通道1=交流</option></select>
+          <label class="muted" style="font-size:12px">无表头时采样率</label><select id="arc-imp-fs"><option value="100000" selected>100 kHz</option></select>
+          <label class="chk"><input type="checkbox" id="arc-imp-train" checked>导入后自动重新训练</label>
+        </div>
+        <div class="hint" style="margin-top:6px">格式：DAQ 导出的 CSV（可含“采样率/通道数/通道名”表头），两列数值 = 交流侧、直流侧电流，采样率 100 kHz，时长 ≥ 0.45 s。
+          文件名中的负载类型（阻性/感性/阻感/电子开关类/混合）、“直流侧弧/交流侧弧/noarc”、序号会自动识别为标签，导入后可修改。
+          浏览器无法直接解压 .rar：请先解压 5-30.rar，再选择其中的 CSV 或整个 5-30 文件夹。</div>
+        <div id="arc-imp-prog" class="imp-prog"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>已导入记录 <span class="sub" id="arc-imp-sub"></span></h3><button class="btn sm" id="arc-imp-clear">清除全部导入</button></div>
+        <div class="tablewrap" style="max-height:360px"><table class="t"><thead><tr><th>编号</th><th>文件</th><th>负载</th><th>标签</th><th>用途</th><th>时长 · 窗</th><th></th></tr></thead><tbody id="arc-imp-list"></tbody></table></div>
+        <div class="hint" style="margin-top:6px">导入的数据经浏览器端预处理后保存在本机浏览器（IndexedDB），刷新页面后仍保留；原始 CSV 不上传、不保存。与内置记录同名的文件会替换内置记录。修改标签或用途后需重新训练模型。</div>
+      </div>
+    </div>
+
+    <div class="card empty-state" id="arc-empty">
+      <div class="es-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h6"/><circle cx="18" cy="16" r="3"/></svg></div>
+      <h3>等待数据接入</h3>
+      <p>平台当前没有任何实测数据，因此不显示监测结果。请在上方导入 DAQ 采集文件；导入后自动完成预处理与模型训练，并显示波形、频谱、特征与诊断结果。</p>
+      <div class="row" style="justify-content:center"><button class="btn" data-load-example>加载示例数据（5-30 内置 29 条）</button></div>
+      <p class="hint">接入方式：手动导入 DAQ 导出的 CSV（如解压后的 5-30.rar）。实时采集接入后将通过同一接口自动写入。</p>
+    </div>
     <div class="grid g2">
-      <div class="card"><h3>实测数据集与预处理 <span class="sub">5-30.rar · 电弧实验平台</span></h3>
+      <div class="card"><h3>数据集与预处理 <span class="sub" id="arc-ds-sub"></span></h3>
         <table class="t"><thead><tr><th>步骤</th><th>处理</th><th>结果</th></tr></thead><tbody id="arc-ds-steps"></tbody></table>
-        <h3 style="margin-top:14px">记录矩阵 <span class="sub">点击选择记录 · 蓝色=训练集，灰色=测试集</span></h3>
-        <table class="t"><thead><tr><th>负载类型</th><th>无电弧</th><th>直流侧电弧</th><th>交流侧电弧</th></tr></thead><tbody id="arc-ds-mat"></tbody></table>
+        <h3 style="margin-top:14px">记录矩阵 <span class="sub">点击选择记录 · 蓝底=训练集，灰底=测试集，虚线框=导入数据</span></h3>
+        <table class="t"><thead><tr id="arc-ds-mat-h"><th>负载类型</th><th>无电弧</th><th>直流侧电弧</th><th>交流侧电弧</th></tr></thead><tbody id="arc-ds-mat"></tbody></table>
       </div>
       <div class="card"><h3>记录全时段概览 <span class="sub" id="arc-ov-sub"></span></h3>
         <canvas id="arc-ov" style="height:250px"></canvas>
@@ -245,7 +285,7 @@
 
   <!-- ================= ④ 电—热融合风险评估与预警 ================= -->
   <section class="page" id="page-risk">
-    <div class="page-title"><h2>电—热融合评估</h2><p>判据分级 · 触发原因 · 处置优先级</p></div>
+    <div class="page-title"><h2>电—热融合评估</h2><p>判据分级 · 触发原因 · 处置优先级 · <span class="sim-tag">仿真</span> 热状态推演</p></div>
     <div class="grid side-main">
       <div class="card">
         <div class="row sp" style="margin-bottom:8px"><h3 style="margin:0">评估输入</h3><button class="btn sm" id="rk-from">载入选中组件</button></div>
@@ -428,6 +468,7 @@
 <script src="data/arc-real.js"></script>
 <script src="js/dsp.js"></script>
 <script src="js/real.js"></script>
+<script src="js/arc-import.js"></script>
 <script src="js/ml.js"></script>
 <script src="js/thermal.js"></script>
 <script src="js/vision.js"></script>
