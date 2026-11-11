@@ -1,7 +1,7 @@
 'use strict';
-/* 实测数据源（平台启动时为空，只有接入/导入的数据才会显示与参与诊断）
-   1) 示例数据：data/arc-real.js（5-30.rar 经 tools/preprocess_arc.py 预处理），需用户点击“加载示例数据”才启用，
-      int16 码值 × LSB = 采集卡读数 / V；启用状态保存在 localStorage
+/* 实测数据源
+   1) 示例数据：data/arc-real.js（5-30.rar 经 tools/preprocess_arc.py 预处理），int16 码值 × LSB = 采集卡读数 / V。
+      平台初始状态为空（等待数据接入）；示例数据仅在用户点击“加载示例数据”后启用，可随时移除，该选择保存在 localStorage
    2) 导入记录：用户手动导入的 DAQ CSV（js/arc-import.js 在浏览器端完成同样的预处理），Float32 存储，保存于 IndexedDB
    每条记录：4 段连续采样 × 10 窗 × 1024 点 × 2 通道（直流侧、交流侧）
    ingest() 为统一的数据接入口：手动导入现在走这里，后续实时采集接入也可调用同一接口 */
@@ -12,9 +12,9 @@ const REAL = (() => {
   const SPLIT_NAMES = { train: '训练集', test: '测试集', none: '不参与训练' };
   const WPR = P.blocks * P.wpb;       // 每记录窗口数
   const builtin = P.records.map(r => ({ ...r, src: 'builtin' }));
-  const EX_KEY = 'pvfg-example-data';
-  let useExample = false;
-  try { useExample = localStorage.getItem(EX_KEY) === '1'; } catch (e) { /* 存储不可用时默认不加载 */ }
+  const EX_KEY = 'pvfg-include-example';
+  let includeExample = false;   // 是否启用示例数据（默认不启用）
+  try { includeExample = localStorage.getItem(EX_KEY) === '1'; } catch (e) { /* 存储不可用时默认不包含 */ }
   let imported = [], records = [], q = null, loading = null, loaded = false;
   const listeners = [];
 
@@ -31,12 +31,13 @@ const REAL = (() => {
   }
   let decoding = null;
   const ensureDecoded = () => decoding || (decoding = decode());
-  const load = () => loading || (loading = Promise.all([useExample ? ensureDecoded() : null, restore()]).then(() => { loaded = true; rebuild(); }));
+  const load = () => loading || (loading = Promise.all([includeExample ? ensureDecoded() : null, restore()]).then(() => { loaded = true; rebuild(); }));
 
-  /* 示例数据（5-30 内置）开关 */
+  /* 示例数据是否参与：没有导入数据时自动参与（初始状态）；有导入数据时由用户选择 */
+  const exampleActive = () => !!q && includeExample;   // 示例数据仅在用户启用时参与
   async function setExample(on) {
-    if (on) await ensureDecoded();
-    useExample = !!on;
+    await ensureDecoded();
+    includeExample = !!on;
     try { localStorage.setItem(EX_KEY, on ? '1' : '0'); } catch (e) { /* 忽略 */ }
     rebuild();
   }
@@ -44,7 +45,7 @@ const REAL = (() => {
   /* 导入记录与同名内置记录合并：同名文件以导入版本为准 */
   function rebuild() {
     const names = new Set(imported.map(r => r.file));
-    records = (useExample && q ? builtin.filter(r => !names.has(r.file)) : []).concat(imported);
+    records = (exampleActive() ? builtin.filter(r => !names.has(r.file)) : []).concat(imported);
     listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
   }
   const onChange = f => listeners.push(f);
@@ -93,6 +94,13 @@ const REAL = (() => {
     await tx('readwrite', s => s.delete(id)).catch(() => {});
     rebuild();
   }
+  /* 重置：清空全部导入记录（含 IndexedDB 副本）并移除示例数据，平台回到初始状态（等待数据接入） */
+  async function resetAll() {
+    imported = []; includeExample = false;
+    try { localStorage.setItem(EX_KEY, '0'); } catch (e) { /* 忽略 */ }
+    await tx('readwrite', s => s.clear()).catch(() => {});
+    rebuild();
+  }
   async function clear() {
     imported = [];
     await tx('readwrite', s => s.clear()).catch(() => {});
@@ -133,8 +141,9 @@ const REAL = (() => {
 
   return {
     P, SIDE_NAMES, SPLIT_NAMES, WPR, load, rec, indexOf, cls, label, win, sample, run,
-    ingest, update, remove, clear, onChange, setExample,
-    get ready() { return loaded; }, get example() { return useExample; }, get hasData() { return records.length > 0; },
+    ingest, update, remove, clear, resetAll, onChange, setExample,
+    get ready() { return loaded; }, get example() { return exampleActive(); }, get includeExample() { return includeExample; },
+    get exampleOnly() { return exampleActive() && imported.length === 0; }, get hasData() { return records.length > 0; },
     get records() { return records; }, get imported() { return imported; },
     get LOADS() { return [...new Set(records.map(r => r.load))]; }
   };

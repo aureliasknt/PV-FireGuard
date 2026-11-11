@@ -58,6 +58,7 @@ const Hotspot = (() => {
 
   function analyzeAndRender() {
     const s = st.src;
+    U.$('#page-hotspot').classList.remove('noinput');   // 有输入后才显示诊断结果
     const res = VIS.analyze(s.T, s.W, s.H, { thK: +U.$('#hs-th').value, grid: s.grid });
     res.regions.forEach(r => Object.assign(r, VIS.partOf(r, s.W, s.H, s.grid)));
     st.res = res;
@@ -205,7 +206,15 @@ const Hotspot = (() => {
     return (g >= 4 ? '【紧急】建议立即快速关断所在组串并现场处置。' : g >= 3 ? '【尽快】建议 24 小时内处理。' : '') + base;
   }
 
-  function onShow() { if (!st.src) run(); else render(); }
+  function onShow() { if (st.src) render(); }   // 不自动生成热像：等待用户上传或主动生成
 
-  return { init, run, loadModule, onShow, get state() { return st; } };
+  /* 重置：清除已输入的热像与诊断结果，回到“等待红外数据” */
+  function clear() {
+    st.src = null; st.res = null; st.history = []; st.review = []; st.rise = null;
+    U.$('#page-hotspot').classList.add('noinput');
+    U.$('#hs-src').textContent = '数据来源：尚未输入';
+    U.$('#hs-file').value = '';
+  }
+
+  return { init, run, loadModule, onShow, clear, get state() { return st; } };
 })();

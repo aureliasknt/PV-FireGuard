@@ -55,24 +55,42 @@ const Arc = (() => {
     const box = U.$('#arc-imp-prog');
     box.innerHTML = files.map((f, k) => `<div class="ip" id="ip-${k}"><span class="nm" title="${f.name}">${f.name}</span><div class="bar"><i style="width:0%"></i></div><span class="msg">等待中 · ${(f.size / 1e6).toFixed(1)} MB</span></div>`).join('');
     const opts = { fsDefault: +U.$('#arc-imp-fs').value, map: U.$('#arc-imp-map').value };
-    let ok = 0;
+    const replace = U.$('#arc-imp-mode').value === 'replace' && (REAL.imported.length > 0 || REAL.includeExample);
+    if (replace && !confirm(`导入方式为“替换现有数据”：导入成功后将清空当前全部 ${REAL.records.length} 条记录（${dataSummary()}），再写入新数据。是否继续？`)) { box.innerHTML = ''; return; }
+    // 先全部解析（失败的文件不影响现有数据），再一次性写入
+    const parsed = [];
     for (let k = 0; k < files.length; k++) {
       const f = files[k], row = U.$('#ip-' + k), bar = row.querySelector('i'), msg = row.querySelector('.msg');
       msg.textContent = '解析中…';
       try {
         const r = await ArcImport.importFile(f, opts, p => { bar.style.width = (p * 90).toFixed(0) + '%'; msg.textContent = `解析中 ${(p * 100).toFixed(0)}%`; });
-        const saved = await REAL.ingest(r);
-        bar.style.width = '100%'; ok++;
-        msg.textContent = `✓ ${saved.id} · ${saved.load} · ${REAL.SIDE_NAMES[saved.side]} #${saved.seq} · ${saved.dur} s · ${saved.windows} 窗（剔除 ${saved.invalid}）· ${saved.chMap} · ${(saved.parseMs / 1000).toFixed(1)} s`;
-        DATA.audit('导入实测数据', `${f.name} → ${saved.id}（${saved.load}，${REAL.SIDE_NAMES[saved.side]}，${saved.dur} s）`);
+        parsed.push({ r, f, row, bar, msg });
+        bar.style.width = '95%'; msg.textContent = '解析完成，等待写入…';
       } catch (e) {
         row.classList.add('err'); bar.style.width = '100%'; bar.style.background = 'var(--red)';
         msg.textContent = '✗ ' + (e.message || e);
       }
     }
-    U.toast(`导入完成：成功 ${ok} / ${files.length} 个文件`, ok === files.length ? 'ok' : 'warn');
+    if (replace && parsed.length) {
+      const before = dataSummary();
+      await REAL.resetAll();
+      DATA.audit('替换数据', `清空原有数据（${before}），写入 ${parsed.length} 个新文件`);
+    } else if (replace) U.toast('没有文件导入成功，现有数据保持不变', 'warn');
+    for (const { r, f, bar, msg } of parsed) {
+      const saved = await REAL.ingest(r);
+      bar.style.width = '100%';
+      msg.textContent = `✓ ${saved.id} · ${saved.load} · ${REAL.SIDE_NAMES[saved.side]} #${saved.seq} · ${saved.dur} s · ${saved.windows} 窗（剔除 ${saved.invalid}）· ${saved.chMap} · ${(saved.parseMs / 1000).toFixed(1)} s`;
+      DATA.audit('导入实测数据', `${f.name} → ${saved.id}（${saved.load}，${REAL.SIDE_NAMES[saved.side]}，${saved.dur} s）`);
+    }
+    const ok = parsed.length;
+    U.toast(`导入完成：成功 ${ok} / ${files.length} 个文件${replace && ok ? '（已替换原有数据）' : ''}`, ok === files.length ? 'ok' : 'warn');
     if (ok && U.$('#arc-imp-train').checked) train();
   }
+
+  const dataSummary = () => {
+    const nImp = REAL.imported.length, nEx = REAL.records.length - nImp;
+    return [nImp ? `导入 ${nImp} 条` : '', nEx ? `示例 ${nEx} 条` : ''].filter(Boolean).join('、') || '无';
+  };
 
   function renderImports() {
     const IM = REAL.imported;
@@ -96,8 +114,12 @@ const Arc = (() => {
     });
     U.$$('#arc-imp-list [data-del]').forEach(el => el.onclick = () => {
       if (!DATA.guard('model')) return;
-      REAL.remove(el.dataset.del); DATA.audit('删除导入数据', el.dataset.del);
-      U.$('#arc-train-info').innerHTML = '<span style="color:#f97316">数据集已变更，请点击“重新训练”使模型生效。</span>';
+      if (!confirm(`删除导入记录 ${el.dataset.del}？`)) return;
+      REAL.remove(el.dataset.del).then(() => {
+        DATA.audit('删除导入数据', el.dataset.del);
+        if (REAL.hasData && U.$('#arc-imp-train').checked) train();
+        else if (REAL.hasData) U.$('#arc-train-info').innerHTML = '<span style="color:#f97316">数据集已变更，请点击“重新训练”使模型生效。</span>';
+      });
     });
   }
 
@@ -106,10 +128,13 @@ const Arc = (() => {
     const keep = st.cur ? st.cur.id : null;
     st.feats = null;
     buildSelect(keep);
-    U.$('#arc-example').textContent = REAL.example ? '移除示例数据' : '加载示例数据';
+    const exb = U.$('#arc-example');
+    exb.disabled = false;
+    exb.textContent = REAL.includeExample ? '移除示例数据' : '加载示例数据';
+    exb.title = '5-30.rar 内置 29 条实测记录，可单独演示，也可与导入数据一起作为训练集';
     renderDataset(); renderImports(); updWinLabel(); drawOverview();
     if (!REAL.hasData) {
-      st.cur = null; st.stream = null; st.ready = false; st.evalM = st.deploy = null; st.meta = null; st.eval = null; st.imp = null; st.hist = { loss: [], acc: [] };
+      st.cur = null; st.stream = null; st.ready = false; st.evalM = st.deploy = null; st.meta = null; st.eval = null; st.imp = null; st.hist = { loss: [], acc: [] }; st.trainError = null;
       U.$('#arc-train-info').textContent = '等待数据接入：导入 CSV 或加载示例数据后自动训练。';
       return;
     }
@@ -130,16 +155,33 @@ const Arc = (() => {
       if (!REAL.imported.length || !DATA.guard('model')) return;
       if (!confirm(`确定清除全部 ${REAL.imported.length} 条导入记录？`)) return;
       await REAL.clear(); DATA.audit('清除导入数据', '全部'); U.$('#arc-imp-prog').innerHTML = '';
-      if (U.$('#arc-imp-train').checked) train();
+      if (REAL.hasData) train();
+    };
+    U.$('#arc-reset').onclick = async () => {
+      if (!REAL.hasData && !REAL.imported.length && !Hotspot.state.src && !Risk.last) { U.toast('当前已是初始状态（无数据），无需重置', 'info'); return; }
+      if (!DATA.guard('model')) return;
+      if (!confirm(`重置数据将清空：
+· 全部记录（${dataSummary()}），包括保存在本浏览器中的导入副本
+· 已训练的判别模型
+· 电站监测历史、告警日志与事件档案
+· 热异常诊断与电—热融合评估结果
+
+平台回到初始状态“等待数据接入”，之后可重新导入其他数据。审计日志保留。是否继续？`)) return;
+      const before = dataSummary();
+      await REAL.resetAll();
+      Hotspot.clear(); Risk.clear();   // 其他模块中由用户输入产生的结果一并清除
+      U.$('#arc-imp-prog').innerHTML = '';
+      DATA.audit('重置数据', `清空全部数据（${before}），并清除热异常诊断与融合评估结果`);
+      U.toast('已重置为初始状态（无数据），可重新导入', 'ok');
     };
     U.$('#arc-example').onclick = async () => {
       if (!DATA.guard('model')) return;
-      const on = !REAL.example;
+      const on = !REAL.includeExample;
       U.$('#arc-example').disabled = true;
       await REAL.setExample(on);
       U.$('#arc-example').disabled = false;
       DATA.audit(on ? '加载示例数据' : '移除示例数据', '5-30.rar 内置 29 条记录');
-      if (st.ready) train();
+      if (REAL.hasData && st.ready) train();
       U.toast(on ? '已加载示例数据（5-30 内置 29 条记录）' : '已移除示例数据', 'ok');
     };
     REAL.onChange(onDataChange);
@@ -286,6 +328,7 @@ const Arc = (() => {
       te = X.map((_, i) => i).filter(i => R[i].split === 'test');
       const miss = [0, 1, 2].filter(c => !tr.some(i => Y[i] === c));
       if (miss.length || !te.length) {
+        st.ready = false; st.evalM = st.deploy = null; st.cur = null; st.stream = null;
         st.trainError = miss.length ? `训练集缺少「${miss.map(c => DSP.CLASS_NAMES[c]).join('、')}」样本` : '测试集为空';
         info.innerHTML = `<span style="color:#ef4444">无法训练：${st.trainError}，请在“已导入记录”中调整标签或用途，或加载示例数据补充训练集。</span>`;
         st.training = false; btn.disabled = false; return st.meta;

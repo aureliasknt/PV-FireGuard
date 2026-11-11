@@ -321,3 +321,11 @@ ul.why { margin: 0; padding: 0; list-style: none; font-size: var(--fs-s); line-h
 #page-station.nodata > :not(.page-title):not(#st-empty) { display: none !important; }
 #page-arc.nodata > .grid:not(.keep) { display: none !important; }
 #page-station:not(.nodata) #st-empty, #page-arc:not(.nodata) #arc-empty { display: none; }
+.data-banner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; padding: 7px 12px; border-radius: var(--r); background: var(--sunk); border: 1px solid var(--line); font-size: var(--fs-s); color: var(--text); }
+.data-banner[hidden] { display: none; }
+.data-banner .btn { margin-left: auto; }
+/* 结果区：未输入时只显示提示卡 */
+.page.noinput .res-col > :not(.res-empty) { display: none !important; }
+.page:not(.noinput) .res-empty { display: none; }
+#page-report.nodata #ev-panel-events, #page-report.nodata #ev-panel-report { display: none !important; }
+#page-report:not(.nodata) #ev-empty { display: none; }

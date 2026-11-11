@@ -65,19 +65,21 @@ const DataPage = (() => {
   }
 
   function live() {
-    const S = Station.state(), t = S.t;
+    const S = Station.state(), t = S.t, on = S.started;   // on：已有数据接入，电站监测运行中
     DATA.SOURCES.forEach(s => {
       const el = U.$('#ds-st-' + s.id); if (!el) return;
-      el.innerHTML = s.fault === 'offline' ? U.tag('离线', 'red') : s.fault === 'drift' ? U.tag('在线·漂移', 'orange') : U.tag('在线', 'ok');
+      el.innerHTML = !on ? U.tag('未接入', 'info') : s.fault === 'offline' ? U.tag('离线', 'red') : s.fault === 'drift' ? U.tag('在线·漂移', 'orange') : U.tag('在线', 'ok');
     });
-    U.$('#ds-q').innerHTML = DATA.SOURCES.map(s => {
+    U.$('#ds-q').innerHTML = !on ? DATA.SOURCES.map(s => `<tr><td>${s.id}</td><td class="muted">—</td><td class="muted">—</td><td class="muted">无数据</td><td>${U.tag('等待数据接入', 'info')}</td></tr>`).join('') : DATA.SOURCES.map(s => {
       const q = DATA.quality(s, t);
       return `<tr><td>${s.id}</td><td style="color:${Math.abs(s.offset) > DATA.SYNC_TH(s) ? '#f97316' : ''}">${s.offset >= 0 ? '+' : ''}${s.offset.toFixed(s.fast ? 2 : 1)} ms <span class="muted">/ ≤${DATA.SYNC_TH(s)}</span></td>
         <td>${(q.comp * 100).toFixed(2)}%</td><td>${q.stale <= 1 ? '实时' : q.stale + ' s 前'}</td><td>${q.ok ? U.tag('通过', 'ok') : U.tag(q.issues.join('、'), 'orange')}</td></tr>`;
     }).join('');
     const nPts = DATA.SOURCES.length, open = S.events.filter(Station.isOpen).length;
+    const nImp = REAL.imported.length, nEx = REAL.records.length - nImp;
     U.$('#ds-store').innerHTML = `
-      <div class="k">仿真运行时长</div><div class="v">${Math.floor(t / 60)} min ${t % 60} s</div>
+      <div class="k">数据来源</div><div class="v">${!REAL.hasData ? '<span class="muted">无（等待数据接入）</span>' : [nImp ? `导入 ${nImp} 条` : '', nEx ? `示例 ${nEx} 条` : ''].filter(Boolean).join(' + ')}</div>
+      <div class="k">监测运行时长</div><div class="v">${Math.floor(t / 60)} min ${t % 60} s</div>
       <div class="k">时序帧（1 Hz，内存窗口）</div><div class="v">${S.frames.length} / 1800 帧</div>
       <div class="k">累计采集记录</div><div class="v">${(t * (nPts + 72)).toLocaleString()} 点</div>
       <div class="k">告警日志</div><div class="v">${S.log.length} 条</div>
@@ -96,8 +98,8 @@ const DataPage = (() => {
       <div class="k">当前用户</div><div class="v">${DATA.ROLES[DATA.role].name}</div>
       <div class="k">页面运行时长</div><div class="v">${Math.floor(up / 60)} min ${up % 60} s</div>
       <div class="k">单步计算耗时</div><div class="v">${S.stepMs.toFixed(1)} ms</div>
-      <div class="k">测点在线</div><div class="v">${DATA.SOURCES.filter(s => DATA.online(s.id)).length} / ${nPts}</div>
-      <div class="k">质量检查未通过</div><div class="v">${DATA.SOURCES.filter(s => !DATA.quality(s, t).ok).length}</div>`;
+      <div class="k">测点在线</div><div class="v">${on ? `${DATA.SOURCES.filter(s => DATA.online(s.id)).length} / ${nPts}` : `0 / ${nPts}（未接入）`}</div>
+      <div class="k">质量检查未通过</div><div class="v">${on ? DATA.SOURCES.filter(s => !DATA.quality(s, t).ok).length : '—'}</div>`;
   }
 
   function exportHistory() {

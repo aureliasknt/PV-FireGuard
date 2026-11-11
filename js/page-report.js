@@ -138,9 +138,15 @@ const Events = (() => {
     DATA.audit('导出事件档案', `${E.length} 起（CSV）`);
   }
 
-  function onShow() { tab(st.tab); }
+  /* 没有监测数据且没有事件档案时显示等待提示 */
+  function gate() {
+    const S = Station.state(), empty = !S.started && !S.events.length;
+    U.$('#page-report').classList.toggle('nodata', empty);
+    return !empty;
+  }
+  function onShow() { if (gate()) tab(st.tab); }
 
-  return { init, live, onShow, select, ST_TAG };
+  return { init, live: () => { if (gate()) live(); }, onShow, select, ST_TAG };
 })();
 
 const Report = (() => {

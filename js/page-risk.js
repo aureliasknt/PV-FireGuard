@@ -27,8 +27,10 @@ const Risk = (() => {
     U.range('rk-age', v => v + ' 年', schedule);
     ty.onchange = () => { setVal('rk-arc', ty.value === 'arc' ? 0.95 : 0.05); schedule(); };
     ['rk-scene', 'rk-mat', 'rk-afci', 'rk-rsd', 'rk-mon', 'rk-spr'].forEach(id => U.$('#' + id).addEventListener('change', schedule));
+    U.$('#rk-eval').onclick = evaluate;
     U.$('#rk-from').onclick = () => {
       const m = Station.selected();
+      if (!REAL.hasData) { U.toast('电站尚无数据：请先导入实测数据，或直接设置参数后点击“开始评估”', 'warn'); return; }
       if (!m) { U.toast('请先在“电站状态监测”中选中组件', 'warn'); return; }
       loadModule(m, Station.env(), Station.isAuto());
     };
@@ -56,6 +58,7 @@ const Risk = (() => {
   }
 
   function evaluate() {
+    U.$('#page-risk').classList.remove('noinput');   // 有评估输入后才显示结果
     const p = read();
     const env = { G: p.G, Ta: p.Ta, v: p.v };
     const f = p.type === 'none' ? null : { type: p.type, sev: p.sev };
@@ -154,7 +157,10 @@ const Risk = (() => {
     return out;
   }
 
-  function onShow() { if (!st.last) evaluate(); else render(); }
+  function onShow() { if (st.last) render(); }   // 不自动评估：等待用户设置工况或载入组件
 
-  return { init, evaluate, loadModule, onShow, get last() { return st.last; } };
+  /* 重置：清除评估结果，回到“尚未评估” */
+  function clear() { clearTimeout(timer); st.last = null; U.$('#page-risk').classList.add('noinput'); }
+
+  return { init, evaluate, loadModule, onShow, clear, get last() { return st.last; } };
 })();

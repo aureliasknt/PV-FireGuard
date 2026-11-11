@@ -263,7 +263,8 @@ const Station = (() => {
       const r = { ready: rs[0].ready, probs: rs[0].probs.map((_, k) => rs.reduce((a, x) => a + x.probs[k], 0) / rs.length), f: rs[0].f.map((_, k) => rs.reduce((a, x) => a + x.f[k], 0) / rs.length) };
       if (!r.ready) { st.probs = null; return; }
       st.probs = r.probs; st.cls = r.probs.indexOf(Math.max(...r.probs));
-      const pa = Arc.arcProb(r.probs);
+      // 跨监测周期指数平滑（α = 0.4）：单个周期的偶发高概率不触发疑似，持续电弧约 3 s 内确认
+      const pa = 0.6 * (st.pArc || 0) + 0.4 * Arc.arcProb(r.probs);
       st.pArc = pa;
       const row = S.modules.filter(m => m.r === st.idx && !m.burnt);
       const hot = row.reduce((a, m) => m.Tm > a.Tm ? m : a, row[0]);
@@ -706,18 +707,30 @@ const Station = (() => {
     setInterval(() => { if (Main.current() === 'station') { const s = U.setup(U.$('#st-canvas')); if (s) drawArray(s); } }, 250);
   }
 
-  /* 有数据才运行：首次有数据时启动电站仿真，数据被全部移除时回到等待状态 */
+  /* 数据源横幅：明确告知当前展示的是示例数据还是导入数据 */
+  function dataBanner() {
+    const nImp = REAL.imported.length, nEx = REAL.records.filter(r => r.src === 'builtin').length;
+    const html = !REAL.hasData ? ''
+      : REAL.exampleOnly ? `<span class="sim-tag">示例数据</span> 当前展示 5-30.rar 内置 ${nEx} 条实测记录（非导入数据）。可在“电弧诊断 → 数据导入”中移除或重置。 <button class="btn sm primary" data-goto-import>导入数据</button>`
+        : nEx ? `当前数据：导入 ${nImp} 条 + <span class="sim-tag">示例数据</span> ${nEx} 条`
+          : `当前数据：导入 ${nImp} 条`;
+    ['#st-banner', '#arc-banner'].forEach(id => { const el = U.$(id); if (el) { el.innerHTML = html; el.hidden = !html; } });
+  }
+
+  /* 有数据才运行；数据源变化（示例 ↔ 导入、替换、重置）时重新开始监测，避免不同数据的历史混在一起 */
   function syncData() {
-    const on = REAL.hasData;
+    const on = REAL.hasData, sig = REAL.records.map(r => r.id + ':' + r.file).join('|');
     U.$('#page-station').classList.toggle('nodata', !on);
     U.$('#page-arc').classList.toggle('nodata', !on);
-    if (on && !S.started) {
-      build(); S.started = true;
+    dataBanner();
+    if (on && (!S.started || sig !== S.sig)) {
+      const restart = S.started;
+      build(); S.started = true; S.sig = sig;
       const nImp = REAL.imported.length, nEx = REAL.records.length - nImp;
-      log('电站', '数据接入，开始监测', 'info', null, `${REAL.records.length} 条实测记录（${nEx ? `示例 ${nEx} 条` : ''}${nEx && nImp ? '，' : ''}${nImp ? `导入 ${nImp} 条` : ''}）；${DATA.SOURCES.length} 个测点接入`);
+      log('电站', restart ? '数据源变更，重新开始监测' : '数据接入，开始监测', 'info', null, `${REAL.records.length} 条实测记录（${nEx ? `示例 ${nEx} 条` : ''}${nEx && nImp ? '，' : ''}${nImp ? `导入 ${nImp} 条` : ''}）；${DATA.SOURCES.length} 个测点接入`);
       for (let i = 0; i < 30; i++) step();
     } else if (!on && S.started) {
-      build(); S.started = false;
+      build(); S.started = false; S.sig = '';
     }
     S.evDirty = true; S.logDirty = true;
     if (Main.current() === 'station') render(); else header();
