@@ -50,15 +50,30 @@ const Hotspot = (() => {
     analyzeAndRender();
   }
 
-  function loadModule(m) {
+  /* 载入电站组件：电站红外通道目前为热仿真，图像标注为“仿真” */
+  function loadModule(m, auto = false) {
     const scene = m.fault ? MAP[m.fault.type] : 'normal';
     U.$('#hs-scene').value = scene;
-    run({ scene, mod: m, amp: m.fault ? Math.max(3, m.dTraw) : undefined, Tb: m.Tbg, label: `电站组件 ${m.id} 红外巡检图像（${DATA.irFor(m.r)}，实测 ΔT = ${U.fmt(m.dTraw, 1)} K）` });
+    run({ scene, mod: m, amp: m.fault ? Math.max(3, m.dTraw) : undefined, Tb: m.Tbg, label: `电站组件 ${m.id} 红外热像（${DATA.irFor(m.r)}，仿真 ΔT = ${U.fmt(m.dTraw, 1)} K）` });
+    st.src.auto = auto;
+    const note = U.$('#hs-auto');
+    note.hidden = !auto;
+    if (auto) note.innerHTML = `<span class="sim-tag">仿真</span> 已导入的数据不含红外热像，以下为电站热仿真中当前温度最高的组件 <b>${m.id}</b> 的热像，用于展示诊断流程。上传实拍红外图像或手动生成后将替换。`;
+  }
+
+  /* 有电站数据、但用户尚未输入红外数据时：自动载入电站中温度最高的组件（仿真） */
+  function autoFromStation() {
+    const S = Station.state();
+    const live = S.modules.filter(m => !m.burnt);
+    if (!S.started || !live.length) return false;
+    loadModule(live.reduce((a, m) => m.Tm > a.Tm ? m : a, live[0]), true);
+    return true;
   }
 
   function analyzeAndRender() {
     const s = st.src;
     U.$('#page-hotspot').classList.remove('noinput');   // 有输入后才显示诊断结果
+    if (!s.auto) U.$('#hs-auto').hidden = true;
     const res = VIS.analyze(s.T, s.W, s.H, { thK: +U.$('#hs-th').value, grid: s.grid });
     res.regions.forEach(r => Object.assign(r, VIS.partOf(r, s.W, s.H, s.grid)));
     st.res = res;
@@ -206,11 +221,17 @@ const Hotspot = (() => {
     return (g >= 4 ? '【紧急】建议立即快速关断所在组串并现场处置。' : g >= 3 ? '【尽快】建议 24 小时内处理。' : '') + base;
   }
 
-  function onShow() { if (st.src) render(); }   // 不自动生成热像：等待用户上传或主动生成
+  /* 用户输入优先；无用户输入时，若电站已有数据则自动显示仿真热像，否则等待输入 */
+  function onShow() {
+    if (st.src && !st.src.auto) { render(); return; }
+    if (REAL.hasData && autoFromStation()) return;
+    if (st.src && st.src.auto) clear();
+  }
 
   /* 重置：清除已输入的热像与诊断结果，回到“等待红外数据” */
   function clear() {
     st.src = null; st.res = null; st.history = []; st.review = []; st.rise = null;
+    U.$('#hs-auto').hidden = true;
     U.$('#page-hotspot').classList.add('noinput');
     U.$('#hs-src').textContent = '数据来源：尚未输入';
     U.$('#hs-file').value = '';

@@ -1,10 +1,11 @@
 'use strict';
 /* 模块④ 电—热融合风险评估与预警：关联电气异常与热状态演化，依据验证判据分级 → 风险等级、触发原因与处置优先级 */
 const Risk = (() => {
-  const st = { last: null };
+  const st = { last: null, auto: false };
   const ft = s => s == null ? '—' : s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${s % 60} 秒`;
   let timer = null;
-  const schedule = () => { clearTimeout(timer); timer = setTimeout(evaluate, 60); };
+  const schedule = () => { if (st.loading) return; clearTimeout(timer); timer = setTimeout(() => { manual(); evaluate(); }, 60); };
+  const manual = () => { st.auto = false; U.$('#rk-auto').hidden = true; };   // 用户手动设置后不再标注为自动评估
 
   function init() {
     const ty = U.$('#rk-type');
@@ -27,7 +28,7 @@ const Risk = (() => {
     U.range('rk-age', v => v + ' 年', schedule);
     ty.onchange = () => { setVal('rk-arc', ty.value === 'arc' ? 0.95 : 0.05); schedule(); };
     ['rk-scene', 'rk-mat', 'rk-afci', 'rk-rsd', 'rk-mon', 'rk-spr'].forEach(id => U.$('#' + id).addEventListener('change', schedule));
-    U.$('#rk-eval').onclick = evaluate;
+    U.$('#rk-eval').onclick = () => { manual(); evaluate(); };
     U.$('#rk-from').onclick = () => {
       const m = Station.selected();
       if (!REAL.hasData) { U.toast('电站尚无数据：请先导入实测数据，或直接设置参数后点击“开始评估”', 'warn'); return; }
@@ -38,14 +39,31 @@ const Risk = (() => {
 
   function setVal(id, v) { const el = U.$('#' + id); el.value = v; el.dispatchEvent(new Event('input')); }
 
-  function loadModule(m, env, auto) {
+  function loadModule(m, env, auto, quiet = false) {
+    if (!quiet) manual();
+    st.loading = true;   // 程序填写参数期间不触发“手动修改”
     U.$('#rk-type').value = m.fault && m.fault.type !== 'reflect' ? m.fault.type : 'none';
     if (m.fault) setVal('rk-sev', m.fault.sev);
     setVal('rk-arc', m.fault && m.fault.type === 'arc' ? 0.95 : 0.05);
     setVal('rk-G', Math.max(100, env.G)); setVal('rk-Ta', env.Ta); setVal('rk-v', env.v); setVal('rk-RH', env.RH); setVal('rk-debris', env.debris);
     U.$('#rk-scene').value = 'ci'; U.$('#rk-rsd').checked = auto; U.$('#rk-afci').checked = auto; U.$('#rk-mon').checked = true;
+    st.loading = false;
     evaluate();
-    U.toast(`已载入组件 ${m.id} 的工况`, 'ok');
+    if (!quiet) U.toast(`已载入组件 ${m.id} 的工况`, 'ok');
+  }
+
+  /* 有电站数据、但用户尚未设置评估工况时：自动评估电站中风险最高（其次温度最高）的组件 */
+  function autoFromStation() {
+    const S = Station.state();
+    const live = S.modules.filter(m => !m.burnt);
+    if (!S.started || !live.length) return false;
+    const m = live.reduce((a, x) => (x.lvIdx > a.lvIdx || (x.lvIdx === a.lvIdx && x.Tm > a.Tm)) ? x : a, live[0]);
+    loadModule(m, S.env, S.auto, true);
+    st.auto = true;
+    const note = U.$('#rk-auto');
+    note.hidden = false;
+    note.innerHTML = `<span class="sim-tag">仿真</span> 尚未手动设置评估工况：以下为根据电站当前工况自动评估的组件 <b>${m.id}</b>（${m.fault ? TH.FAULTS[m.fault.type].name : '无故障'}，${U.fmt(m.Tm, 1)} ℃），热状态演化为仿真推演。调整左侧参数后即为手动评估。`;
+    return true;
   }
 
   function read() {
@@ -157,10 +175,15 @@ const Risk = (() => {
     return out;
   }
 
-  function onShow() { if (st.last) render(); }   // 不自动评估：等待用户设置工况或载入组件
+  /* 用户输入优先；无用户输入时，若电站已有数据则自动评估（仿真），否则等待输入 */
+  function onShow() {
+    if (st.last && !st.auto) { render(); return; }
+    if (REAL.hasData && autoFromStation()) return;
+    if (st.auto) clear();
+  }
 
   /* 重置：清除评估结果，回到“尚未评估” */
-  function clear() { clearTimeout(timer); st.last = null; U.$('#page-risk').classList.add('noinput'); }
+  function clear() { clearTimeout(timer); st.last = null; st.auto = false; U.$('#rk-auto').hidden = true; U.$('#page-risk').classList.add('noinput'); }
 
   return { init, evaluate, loadModule, onShow, clear, get last() { return st.last; } };
 })();

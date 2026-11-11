@@ -256,9 +256,11 @@ const Station = (() => {
         : S.env.inv ? x => x.load === '电子开关类' && x.side === 'none'
           : dG > 30 ? x => x.side === 'none'
             : x => x.load === load && x.side === 'none', 5)
-        || REAL.run(arcM ? x => x.side === 'dc' : x => x.side === 'none', 5);   // 该负载无对应记录时退回任意同类记录
+        || REAL.run(arcM ? x => x.side === 'dc' : x => x.side === 'none', 5)          // 该负载无对应记录时退回任意同类记录
+        || REAL.run(arcM ? x => x.side === 'dc' : x => x.side === 'none', 5, true);   // 导入数据中没有该类信号时，由 5-30 示例数据补充
       if (!ws) { st.probs = null; return; }
-      const g = ws[0], gr = REAL.rec(g.ri);
+      const g = ws[0], gr = g.rec;
+      st.srcSup = !!g.supplement;
       const rs = ws.map(w => Arc.classify(w));
       const r = { ready: rs[0].ready, probs: rs[0].probs.map((_, k) => rs.reduce((a, x) => a + x.probs[k], 0) / rs.length), f: rs[0].f.map((_, k) => rs.reduce((a, x) => a + x.f[k], 0) / rs.length) };
       if (!r.ready) { st.probs = null; return; }
@@ -271,7 +273,7 @@ const Station = (() => {
       if (pa >= C.pSus) st.locate = hot ? hot.id : null;                    // 电—热融合定位：回路内温度最高的组件
       else if (!st.arc) st.locate = null;
       if (pa >= C.pSus) {
-        if (!st.seg) { st.seg = { id: st.id, r: st.idx, loop: DATA.loopPath(st.idx), start: S.t, end: null, peak: pa, confirmed: false, locate: st.locate, cls: DSP.CLASS_NAMES[st.cls], evidence: Arc.evidence(r.f), src: `${gr.id} ${gr.load}·${REAL.SIDE_NAMES[gr.side]} t=${g.t.toFixed(2)} s` }; S.arcSegs.unshift(st.seg); }
+        if (!st.seg) { st.seg = { id: st.id, r: st.idx, loop: DATA.loopPath(st.idx), start: S.t, end: null, peak: pa, confirmed: false, locate: st.locate, cls: DSP.CLASS_NAMES[st.cls], evidence: Arc.evidence(r.f), src: `${gr.id} ${gr.load}·${REAL.SIDE_NAMES[gr.side]} t=${g.t.toFixed(2)} s${g.supplement ? '（示例数据补充）' : ''}` }; S.arcSegs.unshift(st.seg); }
         else if (pa >= st.seg.peak) { st.seg.peak = pa; st.seg.evidence = Arc.evidence(r.f); st.seg.cls = DSP.CLASS_NAMES[st.cls]; st.seg.locate = st.locate; }
       } else closeSeg(st);
       st.hits = pa > C.pArc ? st.hits + 1 : 0;
@@ -543,7 +545,7 @@ const Station = (() => {
       const status = st.noData ? U.tag('采样不满足', 'orange') : st.shutdown ? U.tag('已关断', 'action') : st.arc ? U.tag('电弧确认', 'red') : pa >= FUSE.CFG.pSus ? U.tag('疑似电弧', 'orange') : st.I === 0 ? U.tag('停运', 'info') : U.tag('正常', 'ok');
       const cls = st.noData ? `<span style="color:#fbbf24">CT-S${st.idx + 1} 离线，暂停判别</span>` : st.probs ? `<span style="color:${DSP.CLASS_COLORS[st.cls]}">${DSP.CLASS_NAMES[st.cls]}</span>` : (Arc.ready ? '—' : Arc.state.trainError ? `<span style="color:#fbbf24">模型不可用：${Arc.state.trainError}</span>` : '<span class="muted">模型训练中</span>');
       const btn = st.shutdown ? `<button class="btn sm" data-restore="${st.idx}">恢复送电</button>` : '';
-      return `<div class="srow"><b>${st.id}</b><span>${st.I.toFixed(2)} A</span><div><div class="mini-bar"><i style="width:${(pa * 100).toFixed(0)}%;background:${pa > 0.6 ? '#ef4444' : pa > 0.3 ? '#f97316' : '#22c55e'}"></i></div><div class="muted" style="font-size:12px;margin-top:2px">${DATA.loopPath(st.idx)} · P(电弧) ${(pa * 100).toFixed(1)}% · ${cls}</div></div><span>${status}</span><span>${btn}</span></div>`;
+      return `<div class="srow"><b>${st.id}</b><span>${st.I.toFixed(2)} A</span><div><div class="mini-bar"><i style="width:${(pa * 100).toFixed(0)}%;background:${pa > 0.6 ? '#ef4444' : pa > 0.3 ? '#f97316' : '#22c55e'}"></i></div><div class="muted" style="font-size:12px;margin-top:2px">${DATA.loopPath(st.idx)} · P(电弧) ${(pa * 100).toFixed(1)}% · ${cls}${st.srcSup ? ' · <span class="sim-tag" title="导入数据中没有该组串所需类型的信号，暂由 5-30 示例数据补充">示例补充</span>' : ''}</div></div><span>${status}</span><span>${btn}</span></div>`;
     }).join('');
   }
 

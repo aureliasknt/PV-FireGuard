@@ -294,34 +294,43 @@ const Arc = (() => {
 
   /* ---------- 训练：全部实测窗口提取特征 → MLP ---------- */
   /* 只使用已标注记录；R 保存记录快照，避免训练过程中数据集变更导致错位 */
-  async function extractAll(info) {
-    if (st.feats) return st.feats;
+  /* supp：导入数据缺少某类样本时，追加 5-30 示例记录（实测）作为训练/评估补充 */
+  async function extractAll(info, supp = false) {
+    if (st.feats && st.feats.supp === supp) return st.feats;
     await REAL.load();
-    const X = [], Y = [], R = [], recs = REAL.records.slice();
-    for (let ri = 0; ri < recs.length; ri++) {
-      if (REAL.cls(recs[ri]) == null) continue;
-      for (let w = 0; w < REAL.WPR; w++) { const g = REAL.win(REAL.indexOf(recs[ri].id), w); X.push(DSP.features(g.dc, g.ac)); Y.push(g.cls); R.push(recs[ri]); }
-      info.textContent = `读取实测数据并提取特征：记录 ${ri + 1}/${recs.length}（${X.length} 窗）…`;
+    const X = [], Y = [], R = [];
+    const recs = REAL.records.filter(r => REAL.cls(r) != null).concat(supp ? REAL.supplement() : []);
+    for (let k = 0; k < recs.length; k++) {
+      const r = recs[k];
+      for (let w = 0; w < REAL.WPR; w++) { const g = REAL.winOf(r, w); X.push(DSP.features(g.dc, g.ac)); Y.push(g.cls); R.push(r); }
+      info.textContent = `读取实测数据并提取特征：记录 ${k + 1}/${recs.length}（${X.length} 窗）…`;
       await U.sleep(0);
     }
-    return (st.feats = { X, Y, R });
+    return (st.feats = { X, Y, R, supp, nSupp: supp ? recs.length - REAL.records.filter(r => REAL.cls(r) != null).length : 0 });
   }
 
   async function train() {
     if (st.training) { st.retrain = true; return; }
     st.training = true; st.retrain = false;
     await REAL.load();
-    if (!REAL.records.some(r => REAL.cls(r) != null)) {
+    const split = U.$('#arc-split').value;
+    // 导入数据是否足以训练：训练集需含 3 类样本，按记录划分时还需测试集；不足时自动用示例数据补充
+    const act = REAL.records.filter(r => REAL.cls(r) != null);
+    const trCls = new Set(act.filter(r => split !== 'record' || r.split === 'train').map(r => REAL.cls(r)));
+    const lack = [0, 1, 2].filter(c => !trCls.has(c));
+    const supp = REAL.hasData && (lack.length > 0 || (split === 'record' && !act.some(r => r.split === 'test'))) && REAL.supplement().length > 0;
+    if (!REAL.hasData || (!act.length && !supp)) {
       st.ready = false; st.evalM = st.deploy = null; st.cur = null; st.stream = null; st.training = false;
       st.trainError = REAL.hasData ? '记录均未标注' : null;
-      U.$('#arc-train-info').textContent = REAL.hasData ? '当前记录均未标注，无法训练判别模型：请在“已导入记录”中标注（无电弧/直流侧/交流侧），或加载示例数据作为训练集。' : '等待数据接入：导入 CSV 或加载示例数据后自动训练。';
+      U.$('#arc-train-info').textContent = REAL.hasData ? '当前记录均未标注，无法训练判别模型：请在“已导入记录”中标注（无电弧/直流侧/交流侧）。' : '等待数据接入：导入 CSV 或加载示例数据后自动训练。';
       if (REAL.hasData) U.$('#arc-verdict').innerHTML = '<span class="muted">无可用模型：需要至少一组已标注的记录</span>';
       return null;
     }
     const btn = U.$('#arc-train'); btn.disabled = true;
     const info = U.$('#arc-train-info');
-    const nHid = +U.$('#arc-h').value, epochs = +U.$('#arc-ep').value, split = U.$('#arc-split').value;
-    const { X, Y, R } = await extractAll(info);
+    const nHid = +U.$('#arc-h').value, epochs = +U.$('#arc-ep').value;
+    const { X, Y, R, nSupp } = await extractAll(info, supp);
+    const suppNote = supp ? `导入数据${lack.length ? `缺少「${lack.map(c => DSP.CLASS_NAMES[c]).join('、')}」样本` : '没有测试集记录'}，已自动补充 5-30 示例数据 ${nSupp} 条（实测）参与训练与评估。` : '';
     let tr, te;
     if (split === 'record') {
       tr = X.map((_, i) => i).filter(i => R[i].split === 'train');
@@ -390,7 +399,8 @@ const Arc = (() => {
     st.meta = { nTrain: Xtr.length, nTest: Xte.length, nIn, nHid, nOut, epochs, split, acc: st.eval.acc, recall, far, rec, time: new Date() };
     const nImp = new Set(R.filter(r => r.src === 'import').map(r => r.id)).size;
     st.meta.nRec = new Set(R.map(r => r.id)).size; st.meta.nImp = nImp;
-    info.innerHTML = `训练完成：${st.meta.nRec} 条已标注记录${nImp ? `（含导入 ${nImp} 条）` : ''}，实测窗口 ${X.length}（训练 ${Xtr.length} / 测试 ${Xte.length}，${split === 'record' ? '按记录划分' : '随机划分'}），网络 ${nIn}-${nHid}-${nOut}。单窗测试准确率 <b>${(st.eval.acc * 100).toFixed(1)}%</b>，电弧检出率 <b>${(recall * 100).toFixed(1)}%</b>，误报率 <b>${(far * 100).toFixed(1)}%</b>。<br>本页诊断与回放使用评估模型；在线监测使用全部已标注记录训练的部署模型。`;
+    st.meta.nSupp = nSupp;
+    info.innerHTML = (suppNote ? `<span style="color:#f97316">${suppNote}</span><br>` : '') + `训练完成：${st.meta.nRec} 条已标注记录${nImp ? `（含导入 ${nImp} 条）` : ''}，实测窗口 ${X.length}（训练 ${Xtr.length} / 测试 ${Xte.length}，${split === 'record' ? '按记录划分' : '随机划分'}），网络 ${nIn}-${nHid}-${nOut}。单窗测试准确率 <b>${(st.eval.acc * 100).toFixed(1)}%</b>，电弧检出率 <b>${(recall * 100).toFixed(1)}%</b>，误报率 <b>${(far * 100).toFixed(1)}%</b>。<br>本页诊断与回放使用评估模型；在线监测使用全部已标注记录训练的部署模型。`;
     st.training = false; btn.disabled = false;
     if (st.retrain) { setTimeout(train, 0); return st.meta; }
     drawAll();
@@ -509,16 +519,23 @@ const Arc = (() => {
     if (!REAL.hasData) return;
     if (!st.ready) { U.toast('模型尚未训练完成，请稍候', 'warn'); return; }
     await REAL.load();
-    const R = REAL.records, ri = +U.$('#arc-rec').value, r = R[ri];
-    const prefer = list => list.find(i => R[i].split === 'test') ?? list[0];
-    const idxOf = f => R.map((x, i) => i).filter(i => f(R[i]));
-    const arcI = r.side !== 'none' ? ri : prefer(idxOf(x => x.load === r.load && x.side === 'dc')) ?? prefer(idxOf(x => x.side === 'dc'));
-    let normI = prefer(idxOf(x => x.load === R[arcI].load && x.side === 'none')), note = '';
-    if (normI == null) { normI = prefer(idxOf(x => x.load === '阻感' && x.side === 'none')); note = `（${R[arcI].load}负载无无弧记录，前段借用阻感负载）`; }
+    const r = REAL.rec(+U.$('#arc-rec').value); if (!r) return;
+    // 优先使用当前数据；当前数据中没有所需类型的记录时，由 5-30 示例数据（实测）补充
+    const act = REAL.records, sup = REAL.supplement();
+    const pick = f => { const a = act.filter(f), list = a.length ? a : sup.filter(f); return list.find(x => x.split === 'test') || list[0] || null; };
+    const arcR = r.side !== 'none' ? r : (pick(x => x.load === r.load && x.side === 'dc') || pick(x => x.side === 'dc'));
+    let normR = arcR && pick(x => x.load === arcR.load && x.side === 'none'), note = '';
+    if (arcR && !normR) { normR = pick(x => x.side === 'none'); if (normR) note = `（${arcR.load}负载无无弧记录，前段借用${normR.load}负载）`; }
+    if (!arcR || !normR) {
+      st.stream = null; U.setup(U.$('#arc-timeline'));
+      U.$('#arc-stream-res').innerHTML = `<div class="k">回放</div><div class="v muted">缺少${!arcR ? '电弧' : '无电弧'}记录，无法拼接回放</div>`;
+      return;
+    }
+    const tagSup = x => x.src === 'builtin' && !REAL.example ? ' <span class="sim-tag">示例补充</span>' : '';
     const P = REAL.P, C = FUSE.CFG, winMs = P.N / P.fs * 1000;
     const seq = [];
-    for (let w = 0; w < 2 * P.wpb; w++) seq.push(REAL.win(normI, w));
-    for (let w = P.wpb; w < 4 * P.wpb; w++) seq.push(REAL.win(arcI, w));
+    for (let w = 0; w < 2 * P.wpb; w++) seq.push(REAL.winOf(normR, w));
+    for (let w = P.wpb; w < 4 * P.wpb; w++) seq.push(REAL.winOf(arcR, w));
     const k0 = 2 * P.wpb, out = [];
     let hits = 0, det = null, falseAlarm = 0;
     seq.forEach((g, i) => {
@@ -532,8 +549,8 @@ const Arc = (() => {
     st.stream = { out, k0, det, tOn, tDet, delay, falseAlarm, winMs };
     drawStream();
     U.$('#arc-stream-res').innerHTML = `
-      <div class="k">前段（无电弧）</div><div class="v">${R[normI].id} ${R[normI].load} #${R[normI].seq} · 段1–2${note}</div>
-      <div class="k">后段（${R[arcI].side === 'unknown' ? '待诊断记录' : '电弧'}）</div><div class="v">${R[arcI].id} ${R[arcI].load} · ${REAL.SIDE_NAMES[R[arcI].side]} #${R[arcI].seq} · 段2–4</div>
+      <div class="k">前段（无电弧）</div><div class="v">${normR.id} ${normR.load} #${normR.seq} · 段1–2${note}${tagSup(normR)}</div>
+      <div class="k">后段（${arcR.side === 'unknown' ? '待诊断记录' : '电弧'}）</div><div class="v">${arcR.id} ${arcR.load} · ${REAL.SIDE_NAMES[arcR.side]} #${arcR.seq} · 段2–4${tagSup(arcR)}</div>
       <div class="k">拼接点（电弧出现）</div><div class="v">${tOn.toFixed(1)} ms</div>
       <div class="k">确认检出时刻（P≥${C.pArc}×${C.nWin} 窗）</div><div class="v">${tDet != null ? tDet.toFixed(1) + ' ms' : '未检出'}</div>
       <div class="k">检测延时</div><div class="v"><b>${delay != null ? delay.toFixed(1) + ' ms' : '—'}</b></div>

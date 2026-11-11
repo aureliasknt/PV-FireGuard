@@ -31,7 +31,8 @@ const REAL = (() => {
   }
   let decoding = null;
   const ensureDecoded = () => decoding || (decoding = decode());
-  const load = () => loading || (loading = Promise.all([includeExample ? ensureDecoded() : null, restore()]).then(() => { loaded = true; rebuild(); }));
+  // 示例数据始终解码（仅约 100 ms），但只有用户启用时才进入当前数据集；未启用时仅作为缺失类别的补充来源
+  const load = () => loading || (loading = Promise.all([ensureDecoded(), restore()]).then(() => { loaded = true; rebuild(); }));
 
   /* 示例数据是否参与：没有导入数据时自动参与（初始状态）；有导入数据时由用户选择 */
   const exampleActive = () => !!q && includeExample;   // 示例数据仅在用户启用时参与
@@ -113,8 +114,9 @@ const REAL = (() => {
   const label = r => `${r.id} ${r.load}负载 · ${SIDE_NAMES[r.side]} · #${r.seq}`;
 
   /* 取第 ri 个记录的第 w 个窗口（0…39），返回双通道信号与在原文件中的时刻 */
-  function win(ri, w) {
-    const r = rec(ri), N = P.N, b = Math.floor(w / P.wpb), j = w % P.wpb;
+  /* 读取任意记录（含未启用的示例记录）的第 w 个窗口（0…39） */
+  function winOf(r, w, ri = -1) {
+    const N = P.N, b = Math.floor(w / P.wpb), j = w % P.wpb;
     const dc = new Float64Array(N), ac = new Float64Array(N);
     if (r.buf) {
       const base = b * 2 * P.wpb * N;
@@ -123,24 +125,38 @@ const REAL = (() => {
       const base = r.offset + b * 2 * P.wpb * N;
       for (let i = 0; i < N; i++) { dc[i] = q[base + j * N + i] * P.lsb; ac[i] = q[base + (P.wpb + j) * N + i] * P.lsb; }
     }
-    return { dc, ac, ri, w, block: b, t: (r.blocks[b] + j) * N / P.fs, cls: cls(r) };
+    return { dc, ac, ri, rec: r, w, block: b, t: (r.blocks[b] + j) * N / P.fs, cls: cls(r) };
   }
-  /* 按条件随机抽取一个窗口；无符合条件的记录时返回 null */
-  function sample(filter = () => true) {
+  /* 取当前数据集中第 ri 个记录的第 w 个窗口 */
+  const win = (ri, w) => winOf(rec(ri), w, ri);
+
+  /* 示例补充：当前未启用、且未被同名导入文件替换的示例记录（导入数据缺少某类样本时用于补充） */
+  const supplement = () => {
+    if (!q || exampleActive()) return [];
+    const names = new Set(imported.map(r => r.file));
+    return builtin.filter(r => !names.has(r.file));
+  };
+
+  /* 按条件随机抽取一个窗口；当前数据中没有符合条件的记录时，可退回到示例补充记录；都没有时返回 null */
+  function sample(filter = () => true, fallback = false) {
     const idx = records.map((r, i) => i).filter(i => filter(rec(i)));
-    if (!idx.length) return null;
-    const ri = idx[Math.floor(Math.random() * idx.length)];
-    return win(ri, Math.floor(Math.random() * WPR));
+    if (idx.length) { const ri = idx[Math.floor(Math.random() * idx.length)]; return win(ri, Math.floor(Math.random() * WPR)); }
+    if (!fallback) return null;
+    const sup = supplement().filter(filter);
+    if (!sup.length) return null;
+    const g = winOf(sup[Math.floor(Math.random() * sup.length)], Math.floor(Math.random() * WPR));
+    g.supplement = true;
+    return g;
   }
   /* 按条件随机抽取 k 个连续窗口（同一连续段内，k ≤ 每段窗数） */
-  function run(filter, k) {
-    const g = sample(filter); if (!g) return null;
+  function run(filter, k, fallback = false) {
+    const g = sample(filter, fallback); if (!g) return null;
     const start = g.block * P.wpb + Math.floor(Math.random() * (P.wpb - k + 1));
-    return Array.from({ length: k }, (_, j) => win(g.ri, start + j));
+    return Array.from({ length: k }, (_, j) => { const x = winOf(g.rec, start + j, g.ri); x.supplement = g.supplement; return x; });
   }
 
   return {
-    P, SIDE_NAMES, SPLIT_NAMES, WPR, load, rec, indexOf, cls, label, win, sample, run,
+    P, SIDE_NAMES, SPLIT_NAMES, WPR, load, rec, indexOf, cls, label, win, winOf, sample, run, supplement,
     ingest, update, remove, clear, resetAll, onChange, setExample,
     get ready() { return loaded; }, get example() { return exampleActive(); }, get includeExample() { return includeExample; },
     get exampleOnly() { return exampleActive() && imported.length === 0; }, get hasData() { return records.length > 0; },
